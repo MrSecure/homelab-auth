@@ -4,8 +4,10 @@ homelab-auth script entrypoint
 """
 
 import secrets
+import sys
 import yaml
 import bcrypt
+from pathlib import Path
 from flask import Flask, request, make_response, redirect, render_template_string
 from passlib.apache import HtpasswdFile
 from itsdangerous import TimestampSigner, BadSignature, SignatureExpired
@@ -20,12 +22,78 @@ app = Flask(__name__)
 logger = logging.getLogger(__name__)
 
 
-def load_config():
-    with open("config.yaml", "r") as f:
-        return yaml.safe_load(f)
+def validate_file_path(file_path: str, file_type: str = "file") -> Path:
+    """
+    Validate that a file path is safe and exists.
+
+    Args:
+        file_path: Path to validate
+        file_type: Description of file type for error messages
+
+    Returns:
+        Resolved Path object
+
+    Raises:
+        ValueError: If path is invalid, outside current directory, or does not exist
+    """
+    try:
+        path = Path(file_path).resolve()
+        cwd = Path.cwd().resolve()
+
+        # Ensure path is within current working directory (prevent directory traversal)
+        if not str(path).startswith(str(cwd)):
+            raise ValueError(f"{file_type} path traversal detected: {file_path}")
+
+        # Check if file exists
+        if not path.exists():
+            raise ValueError(f"{file_type} does not exist: {file_path}")
+
+        # Check if it's a file, not a directory
+        if not path.is_file():
+            raise ValueError(f"{file_type} is not a regular file: {file_path}")
+
+        # Check file permissions (readable)
+        if not path.stat().st_mode & 0o400:
+            raise ValueError(f"{file_type} is not readable: {file_path}")
+
+        logger.info("Validated %s path: %s", file_type, path)
+        return path
+
+    except ValueError:
+        raise
+    except Exception as e:
+        raise ValueError(f"Failed to validate {file_type} path '{file_path}': {e}")
 
 
-def validate_and_init_hashing_string(cfg):
+def load_config(config_file: str = "config.yaml") -> dict:
+    """
+    Load and validate configuration file.
+
+    Args:
+        config_file: Path to configuration file
+
+    Returns:
+        Parsed YAML configuration dictionary
+
+    Raises:
+        SystemExit: If config file is invalid or cannot be loaded
+    """
+    try:
+        config_path = validate_file_path(config_file, "config")
+        with open(config_path, "r") as f:
+            return yaml.safe_load(f)
+    except ValueError as e:
+        logger.error("Configuration error: %s", e)
+        sys.exit(1)
+    except yaml.YAMLError as e:
+        logger.error("Invalid YAML in config file: %s", e)
+        sys.exit(1)
+    except Exception as e:
+        logger.error("Failed to load config file: %s", e)
+        sys.exit(1)
+
+
+def validate_and_init_hashing_string(cfg: dict) -> str:
     """
     Validate auth.hashing_string. If null/empty, generate a random one.
     Returns the hashing string to use.
@@ -42,10 +110,34 @@ def validate_and_init_hashing_string(cfg):
     return hashing_string
 
 
+def load_htpasswd_file(htpasswd_path: str) -> HtpasswdFile:
+    """
+    Load and validate htpasswd file.
+
+    Args:
+        htpasswd_path: Path to htpasswd file
+
+    Returns:
+        HtpasswdFile object
+
+    Raises:
+        SystemExit: If htpasswd file is invalid or cannot be loaded
+    """
+    try:
+        path = validate_file_path(htpasswd_path, "htpasswd")
+        return HtpasswdFile(str(path))
+    except ValueError as e:
+        logger.error("Htpasswd configuration error: %s", e)
+        sys.exit(1)
+    except Exception as e:
+        logger.error("Failed to load htpasswd file: %s", e)
+        sys.exit(1)
+
+
 cfg = load_config()
 hashing_string = validate_and_init_hashing_string(cfg)
 signer = TimestampSigner(hashing_string)
-users = HtpasswdFile(cfg["auth"]["htpasswd_path"])
+users = load_htpasswd_file(cfg["auth"]["htpasswd_path"])
 
 
 def get_cookie_subdomain():
@@ -168,10 +260,27 @@ def login():
             pass  # Continue to login form
 
     if request.method == "POST":
-        username = request.form.get("user")
-        password = request.form.get("pw")
+        username = request.form.get("user", "").strip()
+        password = request.form.get("pw", "")
+
+        # Validate inputs are present and within reasonable limits
+        if not username or not password:
+            logger.warning(
+                "Login attempt with missing credentials from %s", request.remote_addr
+            )
+            return "Invalid Credentials", 401
+
+        # Prevent oversized input attacks
+        if len(username) > 255 or len(password) > 4096:
+            logger.warning(
+                "Login attempt with oversized input from %s", request.remote_addr
+            )
+            return "Invalid Credentials", 401
 
         if users.check_password(username, password):
+            logger.info(
+                "Successful login for user: %s from %s", username, request.remote_addr
+            )
             signed_val = signer.sign(username).decode("utf-8")
             domain = get_cookie_subdomain()
 
@@ -187,6 +296,9 @@ def login():
             )
             return resp
 
+        logger.warning(
+            "Failed login attempt for user: %s from %s", username, request.remote_addr
+        )
         return "Invalid Credentials", 401
 
     return render_template_string(LOGIN_FORM, title=cfg["page"]["title"])
