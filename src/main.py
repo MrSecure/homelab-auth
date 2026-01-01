@@ -29,26 +29,35 @@ users = HtpasswdFile(cfg["auth"]["htpasswd_path"])
 def get_cookie_subdomain():
     """
     Extract subdomain from a hostname.
-    Example: 'workbook.abce1234.sec540.cloud'
-    Returns: '.abce1234.sec540.cloud'
+    Validates X-Forwarded-Host against allowed_hosts whitelist.
+    Returns: '.sub.domain.tld' or None
     """
-
     conf_domain = cfg.get("cookie", {}).get("domain")
     if conf_domain:
         return conf_domain
 
-    hostname = request.headers.get("X-Forwarded-Host", request.host)
+    allowed_hosts = cfg.get("cookie", {}).get("allowed_hosts", [])
+    hostname = request.headers.get("X-Forwarded-Host", request.host).lower()
+
+    # If whitelist exists, validate the hostname
+    if allowed_hosts:
+        # Check if hostname matches or is a subdomain of allowed hosts
+        is_allowed = False
+        for allowed in allowed_hosts:
+            if hostname == allowed.lower() or hostname.endswith("." + allowed.lower()):
+                is_allowed = True
+                break
+
+        if not is_allowed:
+            # Fallback to request.host if X-Forwarded-Host does not match
+            hostname = request.host.lower()
+
     parts = hostname.split(".")
-
-    conf_domain = cfg.get("cookie", {}).get("domain")
-    if conf_domain:
-        return conf_domain
-
     if len(parts) < 2:
         return None
 
+    # Extract base domain (everything except first subdomain)
     domain = ".".join(parts[1:])
-
     return f".{domain}"
 
 

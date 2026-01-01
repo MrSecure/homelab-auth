@@ -11,6 +11,11 @@ cookie:
   samesite: "Lax"
 
   # domain: ".labs.home.arpa"  <-- Commented out to enable auto-detection
+  # Use list of allowed domains for X-Forwarded-Host validation
+  domain: null  # null = auto-detect within allowed list
+  allowed_hosts:
+    - "dev.home.arpa"
+    - "labs.home.arpa"
 
 server:
   port: 55000
