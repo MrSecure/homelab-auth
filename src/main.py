@@ -22,7 +22,7 @@ def load_config():
 
 
 cfg = load_config()
-signer = TimestampSigner(cfg["auth"]["secret_key"])
+signer = TimestampSigner(cfg["auth"]["hashing_string"])
 users = HtpasswdFile(cfg["auth"]["htpasswd_path"])
 
 

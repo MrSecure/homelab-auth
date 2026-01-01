@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://www.schemastore.org/any.json
 auth:
-  secret_key: "I-did-change-this-to-a-very-secret-random-string" # trufflehog:ignore
+  hashing_string: "I-did-change-this-to-a-very-secret-random-string" # trufflehog:ignore
   htpasswd_path: "users.htpasswd"
   session_max_age: 43200  # 12 hours in seconds
 
