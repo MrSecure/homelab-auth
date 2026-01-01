@@ -114,7 +114,15 @@ def test_docker_image():
     try:
         # Test that --help works with version tag
         subprocess.run(
-            ["docker", "run", "--rm", f"{image_name}:{version}", "--help"],
+            [
+                "docker",
+                "run",
+                "--rm",
+                f"{image_name}:{version}",
+                "gunicorn",
+                "--check-config",
+                "main:app",
+            ],
             capture_output=True,
             check=True,
             cwd=project_root,
@@ -122,63 +130,20 @@ def test_docker_image():
 
         # Test that --help works with latest tag
         subprocess.run(
-            ["docker", "run", "--rm", f"{image_name}:latest", "--help"],
-            capture_output=True,
-            check=True,
-            cwd=project_root,
-        )
-
-        # Test basic docker run without arguments (should raise NotImplementedError)
-        process = subprocess.run(
-            ["docker", "run", "--rm", f"{image_name}:latest"],
-            capture_output=True,
-            cwd=project_root,
-        )
-        assert process.returncode == 1, (
-            f"Expected exit code 1, got: {process.returncode}"
-        )
-        assert "NotImplementedError" in process.stderr.decode(), (
-            f"Expected NotImplementedError in stderr, got: {process.stderr.decode()}"
-        )
-
-        # Test that mutually exclusive arguments fail appropriately
-        command = [
-            "docker",
-            "run",
-            "--rm",
-            f"{image_name}:latest",
-            "--debug",
-            "--verbose",
-        ]
-        expected_exit = 2
-        process = subprocess.run(
-            command,
-            capture_output=True,
-            cwd=project_root,
-        )
-        assert process.returncode == expected_exit, (
-            f"Expected exit code {expected_exit} when running {command}, "
-            f"but got {process.returncode}"
-        )
-
-        # Test running with environment variables
-        process = subprocess.run(
             [
                 "docker",
                 "run",
                 "--rm",
-                "-e",
-                "LOG_LEVEL=DEBUG",
                 f"{image_name}:latest",
-                "--help",
+                "gunicorn",
+                "--check-config",
+                "main:app",
             ],
             capture_output=True,
             check=True,
             cwd=project_root,
         )
-        assert process.returncode == 0, (
-            f"Received an expected exit code of {process.returncode}"
-        )
+
     except subprocess.CalledProcessError as error:
         pytest.fail(
             f"Command failed: {error.cmd}\nstdout: {error.stdout.decode('utf-8')}\nstderr: {error.stderr.decode('utf-8')}"
