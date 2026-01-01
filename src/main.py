@@ -56,10 +56,10 @@ def get_cookie_subdomain():
 LOGIN_FORM = """
 <!DOCTYPE html>
 <html>
-<head><title>{{ title }}</title></head>
+<head><title>{{ title | escape }}</title></head>
 <body style="font-family: sans-serif; display: flex; justify-content: center; padding-top: 50px;">
     <div style="border: 1px solid #ccc; padding: 20px; border-radius: 8px;">
-        <h2>{{ title }}</h2>
+        <h2>{{ title | escape }}</h2>
         <form method="post">
             <input type="text" name="user" placeholder="Username" required><br><br>
             <input type="password" name="pw" placeholder="Password" required><br><br>
