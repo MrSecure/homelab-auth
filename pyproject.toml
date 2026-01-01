@@ -5,7 +5,14 @@ description = "Home Lab Auth"
 authors = [
     { name = "MrSecure", email = "Python@home.arpa" }
 ]
-dependencies = []
+dependencies = [
+    "Flask>=3.0.0",
+    "PyYAML>=6.0.1",
+    "passlib>=1.7.4",
+    "bcrypt==3.2.2",
+    "itsdangerous>=2.1.0",
+    "gunicorn>=21.2.0"
+]
 readme = "README.md"
 requires-python = ">=3.11"
 
@@ -52,14 +59,6 @@ dev = [
     "python-semantic-release",
     "PyYAML>=6.0.1",
     "refurb",
-]
-prod = [
-    "Flask>=3.0.0",
-    "PyYAML>=6.0.1",
-    "passlib>=1.7.4",
-    "bcrypt==3.2.2",
-    "itsdangerous>=2.1.0",
-    "gunicorn>=21.2.0"
 ]
 
 [tool.coverage.report]

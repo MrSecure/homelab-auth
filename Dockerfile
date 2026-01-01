@@ -20,6 +20,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 COPY "./src/homelab_auth" "/app/homelab_auth"
 COPY "./src/main.py" "/app/main.py"
 COPY "./src/config.yaml" "/app/config.yaml"
+COPY "./src/users.htpasswd" "/app/users.htpasswd"
 
 # Install the project with the project included
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -61,6 +62,7 @@ ENV SERVICE="${NAME}"
 ENV TIMESTAMP="${TIMESTAMP}"
 ENV COMMIT_HASH="${COMMIT_HASH}"
 ENV VERSION="${COMMIT_HASH}"
+ENV SERVICE_PORT="${SERVICE_PORT}"
 
 # These align with https://github.com/opencontainers/image-spec/blob/main/annotations.md
 LABEL org.opencontainers.image.title="${NAME}"
@@ -76,4 +78,4 @@ USER app
 
 EXPOSE ${SERVICE_PORT}
 
-CMD ["gunicorn", "--workers", "4", "--bind", "0.0.0.0:${SERVICE_PORT}", "main:app"]
+CMD gunicorn --workers 4 --bind "0.0.0.0:${SERVICE_PORT}" main:app

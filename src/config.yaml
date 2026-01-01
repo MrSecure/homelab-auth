@@ -1,6 +1,9 @@
 # yaml-language-server: $schema=https://www.schemastore.org/any.json
 auth:
-  hashing_string: "I-did-change-this-to-a-very-secret-random-string" # trufflehog:ignore
+  # configure the hashing string if you want login sessions to persist
+  # across service restarts. If null, a new random string will be generated
+  # on each startup, invalidating all existing sessions.
+  hashing_string: null # trufflehog:ignore
   htpasswd_path: "users.htpasswd"
   session_max_age: 43200  # 12 hours in seconds
 
@@ -10,7 +13,9 @@ cookie:
   httponly: true
   samesite: "Lax"
 
-  # domain: ".labs.home.arpa"  <-- Commented out to enable auto-detection
+  # specify the cookie domain, or use null to auto-detect
+  # domain: ".labs.home.arpa"
+
   # Use list of allowed domains for X-Forwarded-Host validation
   domain: null  # null = auto-detect within allowed list
   allowed_hosts:

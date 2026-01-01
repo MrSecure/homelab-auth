@@ -423,6 +423,14 @@ wheels = [
 name = "homelab-auth"
 version = "0.1.0"
 source = { virtual = "." }
+dependencies = [
+    { name = "bcrypt" },
+    { name = "flask" },
+    { name = "gunicorn" },
+    { name = "itsdangerous" },
+    { name = "passlib" },
+    { name = "pyyaml" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -437,16 +445,16 @@ dev = [
     { name = "pyyaml" },
     { name = "refurb" },
 ]
-prod = [
-    { name = "bcrypt" },
-    { name = "flask" },
-    { name = "gunicorn" },
-    { name = "itsdangerous" },
-    { name = "passlib" },
-    { name = "pyyaml" },
-]
 
 [package.metadata]
+requires-dist = [
+    { name = "bcrypt", specifier = "==3.2.2" },
+    { name = "flask", specifier = ">=3.0.0" },
+    { name = "gunicorn", specifier = ">=21.2.0" },
+    { name = "itsdangerous", specifier = ">=2.1.0" },
+    { name = "passlib", specifier = ">=1.7.4" },
+    { name = "pyyaml", specifier = ">=6.0.1" },
+]
 
 [package.metadata.requires-dev]
 dev = [
@@ -460,14 +468,6 @@ dev = [
     { name = "python-semantic-release" },
     { name = "pyyaml", specifier = ">=6.0.1" },
     { name = "refurb" },
-]
-prod = [
-    { name = "bcrypt", specifier = "==3.2.2" },
-    { name = "flask", specifier = ">=3.0.0" },
-    { name = "gunicorn", specifier = ">=21.2.0" },
-    { name = "itsdangerous", specifier = ">=2.1.0" },
-    { name = "passlib", specifier = ">=1.7.4" },
-    { name = "pyyaml", specifier = ">=6.0.1" },
 ]
 
 [[package]]

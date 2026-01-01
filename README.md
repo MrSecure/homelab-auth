@@ -55,3 +55,9 @@ Both tools are pre-configured and will start working once the repository is push
 For frequently asked questions including release workflow troubleshooting, see our [FAQ documentation](./FAQ.md).
 
 _This project was generated with 🤟 by [Zenable](https://zenable.io)_
+
+Initial htpasswd file created via
+
+```bash
+htpasswd -nbB randomly-generated "$(openssl rand -base64 78)"
+```

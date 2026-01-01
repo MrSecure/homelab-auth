@@ -3,17 +3,21 @@
 homelab-auth script entrypoint
 """
 
+import secrets
 import yaml
 import bcrypt
 from flask import Flask, request, make_response, redirect, render_template_string
 from passlib.apache import HtpasswdFile
 from itsdangerous import TimestampSigner, BadSignature, SignatureExpired
+from urllib.parse import urlparse
+import logging
 
 # --- FIX: Passlib/Bcrypt 4.0+ Compatibility ---
 if not hasattr(bcrypt, "__about__"):
     bcrypt.__about__ = type("obj", (object,), {"__version__": bcrypt.__version__})
 
 app = Flask(__name__)
+logger = logging.getLogger(__name__)
 
 
 def load_config():
@@ -21,8 +25,26 @@ def load_config():
         return yaml.safe_load(f)
 
 
+def validate_and_init_hashing_string(cfg):
+    """
+    Validate auth.hashing_string. If null/empty, generate a random one.
+    Returns the hashing string to use.
+    """
+    hashing_string = cfg.get("auth", {}).get("hashing_string")
+
+    if not hashing_string:
+        # Generate a cryptographically secure random string
+        hashing_string = secrets.token_urlsafe(32)
+        logger.warning(
+            "Generated random hashing_string at startup. Set auth.hashing_string in config.yaml for persistent sessions."
+        )
+
+    return hashing_string
+
+
 cfg = load_config()
-signer = TimestampSigner(cfg["auth"]["hashing_string"])
+hashing_string = validate_and_init_hashing_string(cfg)
+signer = TimestampSigner(hashing_string)
 users = HtpasswdFile(cfg["auth"]["htpasswd_path"])
 
 
@@ -61,6 +83,35 @@ def get_cookie_subdomain():
     return f".{domain}"
 
 
+def is_safe_redirect(target_url):
+    """
+    Validate that the redirect URL's domain is within the cookie domain.
+    Returns True if safe, False otherwise.
+    """
+    if target_url.startswith("/"):
+        return True  # Relative URLs are safe
+
+    try:
+        parsed = urlparse(target_url)
+        target_host = parsed.netloc.lower()
+        cookie_domain = get_cookie_subdomain()
+
+        if not cookie_domain:
+            return False
+
+        # Remove leading dot from cookie domain for comparison
+        cookie_domain_clean = cookie_domain.lstrip(".")
+
+        # Check if target host is the cookie domain or a subdomain of it
+        if target_host == cookie_domain_clean or target_host.endswith(cookie_domain):
+            return True
+
+        return False
+    except Exception:
+        logger.warning("Detected unsafe redirect URL: %s", target_url)
+        return False
+
+
 # HTML Template (Keep same as previous response)
 LOGIN_FORM = """
 <!DOCTYPE html>
@@ -83,6 +134,11 @@ LOGIN_FORM = """
 @app.route("/", methods=["GET"])
 def redir():
     target_url = request.args.get("rd", "/done")
+
+    # Validate redirect URL is within allowed domain
+    if not is_safe_redirect(target_url):
+        target_url = "/done"
+
     login_url = f"https://{cfg['redir']['external_name']}{cfg['cookie']['domain']}"
     return redirect(f"{login_url}/login?rd={target_url}", code=307)
 
@@ -92,6 +148,12 @@ def login():
     target_url = request.args.get(
         "rd", f"https://{cfg['redir']['default_destination']}{cfg['cookie']['domain']}"
     )
+
+    # Validate redirect URL is within allowed domain
+    if not is_safe_redirect(target_url):
+        target_url = (
+            f"https://{cfg['redir']['default_destination']}{cfg['cookie']['domain']}"
+        )
 
     # --- Check for already logged-in user (valid session cookie) ---
     signed_cookie = request.cookies.get(cfg["cookie"]["name"])
