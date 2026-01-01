@@ -9,7 +9,6 @@ from homelab_auth import (
     __maintainer__,
     __project_name__,
     __version__,
-    __license__,
 )
 
 
