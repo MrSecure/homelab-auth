@@ -1,0 +1,25 @@
+description: Home Lab Auth
+name: homelab_auth
+origin:
+  generated: true
+  template:
+    branch: main
+    commit hash: eba3dd1abf25c872e31134c28655476f1b958e1a
+    cookiecutter:
+      _checkout: null
+      _repo_dir: /Users/benjamin/.cookiecutters/ai-native-python
+      _template: gh:zenable-io/ai-native-python
+      company_domain: home.arpa
+      company_name: MrSecure
+      dockerhub: 'no'
+      github_org: MrSecure
+      license: BSD-3-Clause
+      project_name: homelab-auth
+      project_owner_github_username: mrsecure
+      project_short_description: Home Lab Auth
+      project_slug: homelab_auth
+      public: 'yes'
+      python_version: '3.11'
+    dirty: false
+    location: https://github.com/zenable-io/ai-native-python.git
+  timestamp: '2026-01-01T19:45:46+00:00'

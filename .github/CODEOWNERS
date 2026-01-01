@@ -1,0 +1,9 @@
+# Repository owner
+* @mrsecure
+
+# GitHub automation oversight
+.github/** @mrsecure
+
+# Sensitive files
+LICENSE @mrsecure
+SECURITY.md @mrsecure
