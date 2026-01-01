@@ -1,0 +1,28 @@
+# yaml-language-server: $schema=https://www.schemastore.org/any.json
+auth:
+  secret_key: "I-did-change-this-to-a-very-secret-random-string" # trufflehog:ignore
+  htpasswd_path: "users.htpasswd"
+  session_max_age: 43200  # 12 hours in seconds
+
+cookie:
+  name: "pecan_sandy"
+  secure: true
+  httponly: true
+  samesite: "Lax"
+
+  # domain: ".labs.home.arpa"  <-- Commented out to enable auto-detection
+
+server:
+  port: 55000
+  host: "0.0.0.0"
+
+redir:
+  # send unauthenticated users to:
+  # https://external_name + cookie.domain/login
+  external_name: "auth"
+  # Send users who log in without using the redirect parameter to:
+  # https://default_destination + cookie.domain/
+  default_destination: "dashboard"
+
+page:
+  title: "Home Labs Login"

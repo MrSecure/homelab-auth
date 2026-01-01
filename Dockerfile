@@ -19,6 +19,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 COPY "./src/homelab_auth" "/app/homelab_auth"
 COPY "./src/main.py" "/app/main.py"
+COPY "./src/config.yaml" "/app/config.yaml"
 
 # Install the project with the project included
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -53,6 +54,7 @@ RUN groupadd -r app && useradd -r -g app app
 # Metadata
 ARG NAME="homelab_auth"
 ARG DESCRIPTION="Home Lab Auth"
+ARG SERVICE_PORT=55000
 ARG TIMESTAMP
 ARG COMMIT_HASH
 ENV SERVICE="${NAME}"
@@ -72,4 +74,6 @@ LABEL org.opencontainers.image.licenses="NONE"
 
 USER app
 
-ENTRYPOINT ["python3", "/app/main.py"]
+EXPOSE ${SERVICE_PORT}
+
+CMD ["gunicorn", "--workers", "4", "--bind", "0.0.0.0:${SERVICE_PORT}", "main:app"]
