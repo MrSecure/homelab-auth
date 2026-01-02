@@ -5,3 +5,4 @@
 !pyproject.toml
 !uv.lock
 !src/**
+!support/**

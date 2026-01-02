@@ -19,8 +19,10 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 COPY "./src/homelab_auth" "/app/homelab_auth"
 COPY "./src/main.py" "/app/main.py"
-COPY "./src/config.yaml" "/app/config.yaml"
-COPY "./src/users.htpasswd" "/app/users.htpasswd"
+COPY "./support/config.yaml" "/app/config.yaml"
+COPY "./support/users.htpasswd" "/app/users.htpasswd"
+COPY "./support/entrypoint.sh" "/app/entrypoint.sh"
+RUN chmod +x /app/entrypoint.sh
 
 # Install the project with the project included
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -51,6 +53,8 @@ COPY --from=builder --chown=app:app /app /app
 
 # Create app user
 RUN groupadd -r app && useradd -r -g app app
+RUN chown root:app /app/config.yaml && \
+    chmod 0660 /app/config.yaml
 
 # Metadata
 ARG NAME="homelab_auth"
@@ -78,4 +82,4 @@ USER app
 
 EXPOSE ${SERVICE_PORT}
 
-CMD gunicorn --workers 4 --bind "0.0.0.0:${SERVICE_PORT}" main:app
+ENTRYPOINT ["/app/entrypoint.sh"]

@@ -3,7 +3,6 @@
 homelab-auth script entrypoint
 """
 
-import secrets
 import sys
 import yaml
 import bcrypt
@@ -95,16 +94,19 @@ def load_config(config_file: str = "config.yaml") -> dict:
 
 def validate_and_init_hashing_string(cfg: dict) -> str:
     """
-    Validate auth.hashing_string. If null/empty, generate a random one.
+    Validate auth.hashing_string is configured.
     Returns the hashing string to use.
+
+    Raises:
+        ValueError: If hashing_string is not set in config
     """
     hashing_string = cfg.get("auth", {}).get("hashing_string")
 
     if not hashing_string:
-        # Generate a cryptographically secure random string
-        hashing_string = secrets.token_urlsafe(32)
-        logger.warning(
-            "Generated random hashing_string at startup. Set auth.hashing_string in config.yaml for persistent sessions."
+        raise ValueError(
+            "auth.hashing_string is not configured. "
+            "The container entrypoint should have initialized this automatically. "
+            "Ensure the entrypoint script has execute permissions and the config file is writable."
         )
 
     return hashing_string
