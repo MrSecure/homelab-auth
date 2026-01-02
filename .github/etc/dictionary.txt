@@ -8,7 +8,9 @@ dependabot
 home.arpa
 homelab
 homelab-auth
+HSTS
 mrsecure
+nosniff
 refurb
 renovatebot
 skopeo

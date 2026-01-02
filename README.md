@@ -18,7 +18,7 @@ task init
 task build
 
 # Run the image
-docker run MrSecure/homelab-auth:0.0.0 --help
+docker run --rm -ti -p 55000:55000 MrSecure/homelab-auth:0.0.0
 ```
 
 If you'd like to build all of the supported docker images, you can set the `PLATFORM` env var to `all` like this:

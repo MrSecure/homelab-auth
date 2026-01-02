@@ -6,6 +6,7 @@ homelab-auth script entrypoint
 import sys
 import yaml
 import bcrypt
+import hashlib
 from pathlib import Path
 from flask import Flask, request, make_response, redirect, render_template_string
 from passlib.apache import HtpasswdFile
@@ -138,7 +139,20 @@ def load_htpasswd_file(htpasswd_path: str) -> HtpasswdFile:
 
 cfg = load_config()
 hashing_string = validate_and_init_hashing_string(cfg)
+
+# Log only the hash and length of the hashing_string for audit purposes,
+# never log the actual value to prevent exposure in DEBUG logs or exception tracebacks
+_key_hash = hashlib.sha256(hashing_string.encode()).hexdigest()[:16]
+_key_len = len(hashing_string)
+logger.debug(
+    "Session signing key initialized (length=%d, hash=%s)", _key_len, _key_hash
+)
+
+# Create signer immediately and clear the key material from module scope
+# to prevent accidental exposure in exception tracebacks or log statements
 signer = TimestampSigner(hashing_string)
+del hashing_string  # Explicitly remove the cryptographic material from module scope
+
 users = load_htpasswd_file(cfg["auth"]["htpasswd_path"])
 
 
