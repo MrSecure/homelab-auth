@@ -23,13 +23,14 @@ repos:
     - id: detect-private-key
     - id: end-of-file-fixer
     - id: trailing-whitespace
- - repo: https://github.com/lycheeverse/lychee
-   rev: 3ebbf768233523c210666575e9ff519fab12743b  # frozen: lychee-v0.22.0
-   hooks:
-     - id: lychee-docker
-       # Keep all other configs in the config file
-       args: ["--config", ".github/linters/lychee.toml"]
-       types: [markdown]
+### lychee link checker
+#  - repo: https://github.com/lycheeverse/lychee
+#    rev: 3ebbf768233523c210666575e9ff519fab12743b  # frozen: lychee-v0.22.0
+#    hooks:
+#      - id: lychee-docker
+#        # Keep all other configs in the config file
+#        args: ["--config", ".github/linters/lychee.toml"]
+#        types: [markdown]
  - repo: https://github.com/rhysd/actionlint
    rev: 0933c147c9d6587653d45fdcb4c497c57a65f9af  # frozen: v1.7.10
    hooks:
