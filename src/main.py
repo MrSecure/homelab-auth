@@ -241,27 +241,27 @@ LOGIN_FORM = """
 
 @app.route("/", methods=["GET"])
 def redir():
+    domain = get_cookie_subdomain()
     target_url = request.args.get("rd", "/done")
 
     # Validate redirect URL is within allowed domain
     if not is_safe_redirect(target_url):
         target_url = "/done"
 
-    login_url = f"https://{cfg['redir']['external_name']}{cfg['cookie']['domain']}"
+    login_url = f"https://{cfg['redir']['external_name']}{domain}"
     return redirect(f"{login_url}/login?rd={target_url}", code=307)
 
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    domain = get_cookie_subdomain()
     target_url = request.args.get(
-        "rd", f"https://{cfg['redir']['default_destination']}{cfg['cookie']['domain']}"
+        "rd", f"https://{cfg['redir']['default_destination']}{domain}"
     )
 
     # Validate redirect URL is within allowed domain
     if not is_safe_redirect(target_url):
-        target_url = (
-            f"https://{cfg['redir']['default_destination']}{cfg['cookie']['domain']}"
-        )
+        target_url = f"https://{cfg['redir']['default_destination']}{domain}"
 
     # --- Check for already logged-in user (valid session cookie) ---
     signed_cookie = request.cookies.get(cfg["cookie"]["name"])
@@ -298,7 +298,6 @@ def login():
                 "Successful login for user: %s from %s", username, request.remote_addr
             )
             signed_val = signer.sign(username).decode("utf-8")
-            domain = get_cookie_subdomain()
 
             resp = make_response(redirect(target_url))
             resp.set_cookie(
