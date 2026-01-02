@@ -1,0 +1,21 @@
+auth:
+  hashing_string: IhLY9IWUwFCYavJze7JfU_jghR_qUa6Y7F0mryLYFSI
+  htpasswd_path: users.htpasswd
+  session_max_age: 43200
+cookie:
+  name: pecan_sandy
+  secure: true
+  httponly: true
+  samesite: Lax
+  domain: null
+  allowed_hosts:
+  - dev.home.arpa
+  - labs.home.arpa
+server:
+  port: 55000
+  host: 0.0.0.0
+redir:
+  external_name: auth
+  default_destination: dashboard
+page:
+  title: Home Labs Login

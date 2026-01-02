@@ -1,0 +1,49 @@
+# yaml-language-server: $schema=https://json.schemastore.org/traefik-v3.json
+http:
+  router:
+    r-homelab-auth:
+      rule: "Host(`auth.labs.home.arpa`)"
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: myresolver
+      service: sv-homelab-auth
+      middlewares:
+        - sso-auth
+
+  middlewares:
+    # 1. The main auth check
+    auth-check:
+      forwardAuth:
+        address: "http://127.0.0.1:55000/verify"
+        trustForwardHeader: true
+        preserveLocationHeader: true
+        authResponseHeaders:
+          - "Set-Cookie"
+        addAuthCookiesToResponse:
+          - "pecan_sandy" # needs to match config.yaml:cookie.name
+
+    # 2. The redirect logic if auth fails
+    auth-redirect:
+      errors:
+        status:
+          - "401"
+        statusRewrites:            # redirect the browser to the login page on 401
+          "401": "307"
+        service: sv-homelab-auth   # Points to your auth app's service
+        query: "/?rd={url}"        # {url} is a Traefik variable for the original request
+
+    # 3. Combined Chain
+    sso-auth:
+      chain:
+        middlewares:
+          - auth-redirect
+          - auth-check
+
+  services:
+    sv-homelab-auth:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:55000"
+        healthCheck:
+          path: "/healthz"

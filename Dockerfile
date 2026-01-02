@@ -48,11 +48,16 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 WORKDIR "/app"
 
+# Install busybox static for health check
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    busybox-static \
+    && rm -rf /var/lib/apt/lists/*
+RUN groupadd -r app && useradd -r -g app app
+
 # Copy the virtual environment from builder
 COPY --from=builder --chown=app:app /app /app
 
 # Create app user
-RUN groupadd -r app && useradd -r -g app app
 RUN chown root:app /app/config.yaml && \
     chmod 0660 /app/config.yaml
 
@@ -83,3 +88,5 @@ USER app
 EXPOSE ${SERVICE_PORT}
 
 ENTRYPOINT ["/app/entrypoint.sh"]
+
+HEALTHCHECK NONE

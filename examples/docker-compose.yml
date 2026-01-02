@@ -1,0 +1,14 @@
+services:
+  auth-service:
+    image: ghcr.io/mrsecure/homelab-auth:latest
+    container_name: homelab-auth
+    restart: unless-stopped
+    ports:
+      - "55000:55000"
+    volumes:
+      # Mount config and user database as read-only for security
+      - ./config.yaml:/app/config.yaml
+      - ./users.htpasswd:/app/users.htpasswd:ro
+    environment:
+      # Optional: Override Gunicorn settings via environment variables
+      - GUNICORN_CMD_ARGS=--workers 4 --bind 0.0.0.0:55000 --access-logfile -
