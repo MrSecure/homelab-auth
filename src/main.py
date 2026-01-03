@@ -238,6 +238,7 @@ def render_login_template(title: str) -> str:
         Rendered HTML string
     """
     template_path = cfg.get("page", {}).get("template_path")
+    advisory = cfg.get("page", {}).get("advisory")
 
     if template_path:
         try:
@@ -250,7 +251,7 @@ def render_login_template(title: str) -> str:
             env = Environment(loader=FileSystemLoader(template_dir))
             template = env.get_template(template_name)
             logger.info("Loaded login template from: %s", path)
-            return template.render(title=title)
+            return template.render(title=title, advisory=advisory)
 
         except ValueError as e:
             logger.warning(
@@ -267,7 +268,7 @@ def render_login_template(title: str) -> str:
 
     # Fallback to built-in template
     logger.debug("Using built-in LOGIN_FORM template")
-    return render_template_string(LOGIN_FORM, title=title)
+    return render_template_string(LOGIN_FORM, title=title, advisory=advisory)
 
 
 # HTML Template (Keep same as previous response)
@@ -276,13 +277,18 @@ LOGIN_FORM = """
 <html>
 <head><title>{{ title | escape }}</title></head>
 <body style="font-family: sans-serif; display: flex; justify-content: center; padding-top: 50px;">
-    <div style="border: 1px solid #ccc; padding: 20px; border-radius: 8px;">
+    <div style="border: 1px solid #ccc; padding: 20px; border-radius: 8px; max-width: 400px;">
         <h2>{{ title | escape }}</h2>
         <form method="post">
             <input type="text" name="user" placeholder="Username" required><br><br>
             <input type="password" name="pw" placeholder="Password" required><br><br>
             <button type="submit" style="width: 100%;">Login</button>
         </form>
+        {% if advisory %}
+        <div style="margin-top: 20px; padding: 15px; background-color: #f0f8ff; border-left: 4px solid #0066cc; border-radius: 4px; color: #333;">
+            <p style="margin: 8px 0 0 0; font-size: 14px;">{{ advisory | escape }}</p>
+        </div>
+        {% endif %}
     </div>
 </body>
 </html>

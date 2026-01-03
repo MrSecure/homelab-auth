@@ -18,5 +18,8 @@ redir:
   external_name: auth
   default_destination: dashboard
 page:
-  title: SEC540 Range Access
   template_path: login_template.html.j2
+  title: SEC540 Range Access
+  advisory: |
+    This system is for authorized users only. All activities are monitored and recorded.
+    Unauthorized access is prohibited and may be subject to criminal prosecution.

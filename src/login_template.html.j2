@@ -124,6 +124,31 @@
             display: flex;
             flex-direction: column;
         }
+
+        .advisory {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: rgba(100, 200, 255, 0.1);
+            border-left: 4px solid #00bccc;
+            border-radius: 6px;
+            color: rgba(255, 255, 255, 0.95);
+        }
+
+        .advisory strong {
+            color: #00bccc;
+            text-transform: uppercase;
+            font-size: 12px;
+            letter-spacing: 0.5px;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .advisory p {
+            margin: 0;
+            font-size: 13px;
+            line-height: 1.5;
+            color: rgba(255, 255, 255, 0.85);
+        }
     </style>
 </head>
 <body>
@@ -142,6 +167,11 @@
             </div>
             <button type="submit">Login</button>
         </form>
+        {% if advisory %}
+        <div class="advisory">
+            {{ advisory | escape }}
+        </div>
+        {% endif %}
     </div>
 </body>
 </html>
