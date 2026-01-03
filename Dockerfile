@@ -19,6 +19,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 COPY "./src/homelab_auth" "/app/homelab_auth"
 COPY "./src/main.py" "/app/main.py"
+COPY "./src/login_template.html.j2" "/app/login_template.html.j2"
 COPY "./support/config.yaml" "/app/config.yaml"
 COPY "./support/users.htpasswd" "/app/users.htpasswd"
 COPY "./support/entrypoint.sh" "/app/entrypoint.sh"

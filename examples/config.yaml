@@ -18,4 +18,9 @@ redir:
   external_name: auth
   default_destination: dashboard
 page:
-  title: Home Labs Login
+  template_path: login_template.html.j2
+  title: Home Lab Access
+  advisory: |
+    This system is for authorized users only. All activities are monitored and recorded.
+
+    Unauthorized access is prohibited and may be subject to criminal prosecution.
