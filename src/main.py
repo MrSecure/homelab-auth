@@ -230,7 +230,7 @@ def is_safe_redirect(target_url):
         return False
 
 
-def render_login_template(title: str) -> str:
+def render_login_template(title: str, feedback: str = None) -> str:
     """
     Render the login page template.
 
@@ -240,6 +240,7 @@ def render_login_template(title: str) -> str:
 
     Args:
         title: Page title to pass to the template
+        feedback: Optional error or feedback message to display
 
     Returns:
         Rendered HTML string
@@ -258,7 +259,7 @@ def render_login_template(title: str) -> str:
             env = Environment(loader=FileSystemLoader(template_dir))
             template = env.get_template(template_name)
             logger.info("Loaded login template from: %s", path)
-            return template.render(title=title, advisory=advisory)
+            return template.render(title=title, advisory=advisory, feedback=feedback)
 
         except ValueError as e:
             logger.warning(
@@ -275,7 +276,9 @@ def render_login_template(title: str) -> str:
 
     # Fallback to built-in template
     logger.debug("Using built-in LOGIN_FORM template")
-    return render_template_string(LOGIN_FORM, title=title, advisory=advisory)
+    return render_template_string(
+        LOGIN_FORM, title=title, advisory=advisory, feedback=feedback
+    )
 
 
 # HTML Template (Keep same as previous response)
@@ -291,6 +294,11 @@ LOGIN_FORM = """
             <input type="password" name="pw" placeholder="Password" required><br><br>
             <button type="submit" style="width: 100%;">Login</button>
         </form>
+        {% if feedback %}
+        <div style="margin-top: 20px; padding: 15px; background-color: #ffcccc; border-left: 4px solid #cc0000; border-radius: 4px; color: #990000;">
+            <p style="margin: 8px 0 0 0; font-size: 14px;">{{ feedback | escape }}</p>
+        </div>
+        {% endif %}
         {% if advisory %}
         <div style="margin-top: 20px; padding: 15px; background-color: #f0f8ff; border-left: 4px solid #0066cc; border-radius: 4px; color: #333;">
             <p style="margin: 8px 0 0 0; font-size: 14px;">{{ advisory | escape }}</p>
@@ -349,14 +357,18 @@ def login():
             logger.warning(
                 "Login attempt with missing credentials from %s", request.remote_addr
             )
-            return "Invalid Credentials", 401
+            return render_login_template(
+                cfg["page"]["title"], feedback="Invalid Credentials."
+            ), 401
 
         # Prevent oversized input attacks
         if len(username) > 255 or len(password) > 4096:
             logger.warning(
                 "Login attempt with oversized input from %s", request.remote_addr
             )
-            return "Invalid Credentials", 401
+            return render_login_template(
+                cfg["page"]["title"], feedback="Invalid Credentials."
+            ), 401
 
         if users.check_password(username, password):
             logger.info(
@@ -379,7 +391,9 @@ def login():
         logger.warning(
             "Failed login attempt for user: %s from %s", username, request.remote_addr
         )
-        return "Invalid Credentials", 401
+        return render_login_template(
+            cfg["page"]["title"], feedback="Invalid Credentials."
+        ), 401
 
     return render_login_template(cfg["page"]["title"])
 
