@@ -1,13 +1,17 @@
 services:
   auth-service:
-    image: ghcr.io/mrsecure/homelab-auth:latest
+    # image: ghcr.io/mrsecure/homelab-auth:latest
+    build:
+      context: ../
+      dockerfile: Dockerfile
+      no_cache: true
     container_name: homelab-auth
     restart: unless-stopped
     ports:
       - "55000:55000"
     volumes:
       # Mount config and user database as read-only for security
-      - ./config.yaml:/app/config.yaml
+      - ./config.yaml:/app/config.yaml:ro
       - ./users.htpasswd:/app/users.htpasswd:ro
     environment:
       # Optional: Override Gunicorn settings via environment variables

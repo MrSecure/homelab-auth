@@ -1,5 +1,4 @@
 auth:
-  hashing_string: IhLY9IWUwFCYavJze7JfU_jghR_qUa6Y7F0mryLYFSI
   htpasswd_path: users.htpasswd
   session_max_age: 43200
 cookie:
@@ -20,7 +19,10 @@ redir:
 page:
   template_path: login_template.html.j2
   title: Home Lab Access
-  advisory: |
-    This system is for authorized users only. All activities are monitored and recorded.
+  advisory: 'This system is for authorized users only. All activities are monitored
+    and recorded.
+
 
     Unauthorized access is prohibited and may be subject to criminal prosecution.
+
+    '

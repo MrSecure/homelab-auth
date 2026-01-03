@@ -37,21 +37,24 @@ if not hashing_string:
     hashing_string = secrets.token_urlsafe(32)
     config['auth']['hashing_string'] = hashing_string
 
-    # Write the updated config back to file
-    with open(config_file, 'w') as f:
-        yaml.dump(config, f, default_flow_style=False, sort_keys=False)
-
-    print(f"Generated and persisted hashing_string in {config_file}")
+    # Try to write the updated config back to file
+    try:
+        with open(config_file, 'w') as f:
+            yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+        print(f"Generated and persisted hashing_string in {config_file}")
+    except IOError as e:
+        # Fail gracefully - the application will use the SHA1 hash of config as fallback
+        print(f"Warning: Could not write hashing_string to {config_file}: {e}")
+        print("The application will use a fallback hashing_string based on config data")
 else:
     print("Using existing hashing_string from config file")
 
 PYTHON_SCRIPT
 
-
 # Exit if Python script failed
 # shellcheck disable=SC2181
 if [[ $? -ne 0 ]]; then
-    echo "Error: Failed to initialize hashing_string" >&2
+    echo "Error: Failed to process config file" >&2
     exit 1
 fi
 
