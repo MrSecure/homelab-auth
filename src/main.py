@@ -9,6 +9,7 @@ import bcrypt
 import hashlib
 from pathlib import Path
 from flask import Flask, request, make_response, redirect, render_template_string
+from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 from passlib.apache import HtpasswdFile
 from itsdangerous import TimestampSigner, BadSignature, SignatureExpired
 from urllib.parse import urlparse
@@ -19,6 +20,8 @@ if not hasattr(bcrypt, "__about__"):
     bcrypt.__about__ = type("obj", (object,), {"__version__": bcrypt.__version__})
 
 app = Flask(__name__)
+app.config["JSON_SORT_KEYS"] = False
+app.config["MAX_CONTENT_LENGTH"] = 16 * 1024  # 16KB max request body
 logger = logging.getLogger(__name__)
 
 
@@ -220,6 +223,53 @@ def is_safe_redirect(target_url):
         return False
 
 
+def render_login_template(title: str) -> str:
+    """
+    Render the login page template.
+
+    Attempts to load and render a Jinja2 template from the configured
+    page.template_path. If the template path is not configured or the file
+    cannot be loaded, falls back to the built-in LOGIN_FORM template.
+
+    Args:
+        title: Page title to pass to the template
+
+    Returns:
+        Rendered HTML string
+    """
+    template_path = cfg.get("page", {}).get("template_path")
+
+    if template_path:
+        try:
+            # Validate the template path for security
+            path = validate_file_path(template_path, "template")
+            template_dir = str(path.parent)
+            template_name = path.name
+
+            # Create Jinja2 environment and load template
+            env = Environment(loader=FileSystemLoader(template_dir))
+            template = env.get_template(template_name)
+            logger.info("Loaded login template from: %s", path)
+            return template.render(title=title)
+
+        except ValueError as e:
+            logger.warning(
+                "Template validation failed: %s. Using fallback template.", e
+            )
+        except TemplateNotFound as e:
+            logger.warning("Template not found: %s. Using fallback template.", e)
+        except Exception as e:
+            logger.warning(
+                "Failed to load template from %s: %s. Using fallback template.",
+                template_path,
+                e,
+            )
+
+    # Fallback to built-in template
+    logger.debug("Using built-in LOGIN_FORM template")
+    return render_template_string(LOGIN_FORM, title=title)
+
+
 # HTML Template (Keep same as previous response)
 LOGIN_FORM = """
 <!DOCTYPE html>
@@ -242,11 +292,13 @@ LOGIN_FORM = """
 @app.route("/", methods=["GET"])
 def redir():
     domain = get_cookie_subdomain()
-    target_url = request.args.get("rd", "/done")
+    target_url = request.args.get(
+        "rd", f"https://{cfg['redir']['default_destination']}{domain}"
+    )
 
     # Validate redirect URL is within allowed domain
     if not is_safe_redirect(target_url):
-        target_url = "/done"
+        target_url = f"https://{cfg['redir']['default_destination']}{domain}"
 
     login_url = f"https://{cfg['redir']['external_name']}{domain}"
     return redirect(f"{login_url}/login?rd={target_url}", code=307)
@@ -316,7 +368,7 @@ def login():
         )
         return "Invalid Credentials", 401
 
-    return render_template_string(LOGIN_FORM, title=cfg["page"]["title"])
+    return render_login_template(cfg["page"]["title"])
 
 
 @app.route("/verify", methods=["GET"])
@@ -330,6 +382,34 @@ def verify():
         return "OK", 200
     except (BadSignature, SignatureExpired):
         return "Invalid Session", 401
+
+
+@app.errorhandler(400)
+def handle_bad_request(error):
+    """Handle malformed requests gracefully."""
+    logger.warning("Bad request received: %s", error)
+    return "Bad Request", 400
+
+
+@app.errorhandler(408)
+def handle_request_timeout(error):
+    """Handle request timeout."""
+    logger.warning("Request timeout: %s", error)
+    return "Request Timeout", 408
+
+
+@app.errorhandler(413)
+def handle_payload_too_large(error):
+    """Handle oversized request body."""
+    logger.warning("Payload too large: %s", error)
+    return "Payload Too Large", 413
+
+
+@app.errorhandler(500)
+def handle_internal_error(error):
+    """Handle internal server errors gracefully."""
+    logger.error("Internal server error: %s", error)
+    return "Internal Server Error", 500
 
 
 @app.route("/healthz", methods=["GET"])

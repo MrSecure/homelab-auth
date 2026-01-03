@@ -55,8 +55,16 @@ if [[ $? -ne 0 ]]; then
     exit 1
 fi
 
-# Start gunicorn
+# Start gunicorn with proper timeout and error handling configuration
 exec gunicorn \
     --workers 4 \
+    --worker-class sync \
     --bind "0.0.0.0:${SERVICE_PORT:-55000}" \
+    --timeout 30 \
+    --keep-alive 5 \
+    --max-requests 1000 \
+    --max-requests-jitter 100 \
+    --graceful-timeout 10 \
+    --error-logfile - \
+    --access-logfile - \
     main:app

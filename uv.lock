@@ -428,6 +428,7 @@ dependencies = [
     { name = "flask" },
     { name = "gunicorn" },
     { name = "itsdangerous" },
+    { name = "jinja2" },
     { name = "passlib" },
     { name = "pyyaml" },
 ]
@@ -452,6 +453,7 @@ requires-dist = [
     { name = "flask", specifier = ">=3.0.0" },
     { name = "gunicorn", specifier = ">=21.2.0" },
     { name = "itsdangerous", specifier = ">=2.1.0" },
+    { name = "jinja2", specifier = ">=3.0.0" },
     { name = "passlib", specifier = ">=1.7.4" },
     { name = "pyyaml", specifier = ">=6.0.1" },
 ]

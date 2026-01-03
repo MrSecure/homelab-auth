@@ -1,38 +1,22 @@
-# yaml-language-server: $schema=https://www.schemastore.org/any.json
 auth:
-  # configure the hashing string if you want login sessions to persist
-  # across service restarts. If null, a new random string will be generated
-  # on each startup, invalidating all existing sessions.
-  hashing_string: null # trufflehog:ignore
-  htpasswd_path: "users.htpasswd"
-  session_max_age: 43200  # 12 hours in seconds
-
+  hashing_string: 6NHHeMlkPptJqafxsVowwYlcKhI_cuCqftzkBaydJaY
+  htpasswd_path: users.htpasswd
+  session_max_age: 43200
 cookie:
-  name: "pecan_sandy"
+  name: pecan_sandy
   secure: true
   httponly: true
-  samesite: "Lax"
-
-  # specify the cookie domain, or use null to auto-detect
-  # domain: ".labs.home.arpa"
-
-  # Use list of allowed domains for X-Forwarded-Host validation
-  domain: null  # null = auto-detect within allowed list
+  samesite: Lax
+  domain: null
   allowed_hosts:
-    - "dev.home.arpa"
-    - "labs.home.arpa"
-
+  - dev.home.arpa
+  - labs.home.arpa
 server:
   port: 55000
-  host: "0.0.0.0"
-
+  host: 0.0.0.0
 redir:
-  # send unauthenticated users to:
-  # https://external_name + cookie.domain/login
-  external_name: "auth"
-  # Send users who log in without using the redirect parameter to:
-  # https://default_destination + cookie.domain/
-  default_destination: "dashboard"
-
+  external_name: auth
+  default_destination: dashboard
 page:
-  title: "Home Labs Login"
+  title: SEC540 Range Access
+  template_path: login_template.html.j2
