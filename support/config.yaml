@@ -19,7 +19,7 @@ redir:
   default_destination: dashboard
 page:
   template_path: login_template.html.j2
-  title: SEC540 Range Access
+  title: Home Lab Access
   advisory: |
     This system is for authorized users only. All activities are monitored and recorded.
     Unauthorized access is prohibited and may be subject to criminal prosecution.
