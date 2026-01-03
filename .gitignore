@@ -332,3 +332,7 @@ $RECYCLE.BIN/
 
 # Ignore docker build tar files
 *homelab-auth*.tar
+
+# Ignore environment files
+.env
+.envrc

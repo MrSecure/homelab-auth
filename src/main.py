@@ -4,6 +4,7 @@ homelab-auth script entrypoint
 """
 
 import sys
+import json
 import yaml
 import bcrypt
 import hashlib
@@ -100,17 +101,23 @@ def validate_and_init_hashing_string(cfg: dict) -> str:
     """
     Validate auth.hashing_string is configured.
     Returns the hashing string to use.
+    Falls back to SHA1 hash of config if not explicitly configured.
 
-    Raises:
-        ValueError: If hashing_string is not set in config
+    Args:
+        cfg: Configuration dictionary
+
+    Returns:
+        The hashing string to use for signing
     """
     hashing_string = cfg.get("auth", {}).get("hashing_string")
 
     if not hashing_string:
-        raise ValueError(
+        # Fallback to SHA1 hash of config data as a system property
+        cfg_str = json.dumps(cfg, sort_keys=True)
+        hashing_string = hashlib.sha1(cfg_str.encode()).hexdigest()
+        logger.warning(
             "auth.hashing_string is not configured. "
-            "The container entrypoint should have initialized this automatically. "
-            "Ensure the entrypoint script has execute permissions and the config file is writable."
+            "Using SHA1 hash of config as fallback."
         )
 
     return hashing_string
