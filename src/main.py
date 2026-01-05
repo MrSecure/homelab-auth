@@ -411,6 +411,33 @@ def verify():
         return "Invalid Session", 401
 
 
+@app.route("/logout", methods=["GET", "POST"])
+def logout():
+    """Logout endpoint that invalidates the session cookie."""
+    domain = get_cookie_subdomain()
+    target_url = request.args.get(
+        "rd", f"https://{cfg['redir']['default_destination']}{domain}"
+    )
+
+    # Validate redirect URL is within allowed domain
+    if not is_safe_redirect(target_url):
+        target_url = f"https://{cfg['redir']['default_destination']}{domain}"
+
+    logger.info("User logout from %s", request.remote_addr)
+
+    resp = make_response(redirect(target_url))
+    resp.set_cookie(
+        key=cfg["cookie"]["name"],
+        value="logged-out",
+        domain=domain,
+        max_age=0,
+        httponly=cfg["cookie"]["httponly"],
+        secure=cfg["cookie"]["secure"],
+        samesite=cfg["cookie"]["samesite"],
+    )
+    return resp
+
+
 @app.errorhandler(400)
 def handle_bad_request(error):
     """Handle malformed requests gracefully."""
