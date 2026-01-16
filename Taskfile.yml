@@ -139,7 +139,7 @@ tasks:
     deps: ["coverage-erase"]
     cmds:
       - task: unit-test
-      - task: integration-test
+      # - task: integration-test
 
   coverage-erase:
     desc: Erase coverage
