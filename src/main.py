@@ -415,17 +415,12 @@ def verify():
 def logout():
     """Logout endpoint that invalidates the session cookie."""
     domain = get_cookie_subdomain()
-    target_url = request.args.get(
-        "rd", f"https://{cfg['redir']['default_destination']}{domain}"
-    )
-
-    # Validate redirect URL is within allowed domain
-    if not is_safe_redirect(target_url):
-        target_url = f"https://{cfg['redir']['default_destination']}{domain}"
 
     logger.info("User logout from %s", request.remote_addr)
 
-    resp = make_response(redirect(target_url))
+    resp = make_response(
+        render_login_template(cfg["page"]["title"], feedback="Logged out.")
+    )
     resp.set_cookie(
         key=cfg["cookie"]["name"],
         value="logged-out",
