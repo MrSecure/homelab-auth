@@ -714,7 +714,7 @@ def test_open_redirect_protection():
         assert 'evil.com' not in response.headers.get('Location', '')
 
 @pytest.mark.unit
-def test_no_token_in_logs(caplog):
+def test_no_token_in_logs(captured_log):
     """Session tokens must not appear in logs."""
     # Generate token and verify it's not logged
     pass
