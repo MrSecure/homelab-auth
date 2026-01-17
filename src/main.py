@@ -5,6 +5,8 @@ homelab-auth script entrypoint
 
 import sys
 import logging
+import argparse
+import os
 
 # Setup logging early to suppress passlib warnings
 # noqa: E402
@@ -103,28 +105,39 @@ def load_config(config_file: str = "config.yaml") -> dict:
         sys.exit(1)
 
 
-def validate_and_init_hashing_string(cfg: dict) -> str:
+def validate_and_init_hashing_string(
+    cfg: dict, cli_key: str = None, env_key: str = None
+) -> str:
     """
-    Validate auth.hashing_string is configured.
+    Validate and initialize the hashing string for session signing.
     Returns the hashing string to use.
-    Falls back to SHA1 hash of config if not explicitly configured.
+    Falls back to SHA1 hash of config if not explicitly configured via CLI or environment.
 
     Args:
         cfg: Configuration dictionary
+        cli_key: Optional hashing key from CLI argument
+        env_key: Optional hashing key from environment variable
 
     Returns:
         The hashing string to use for signing
     """
-    hashing_string = cfg.get("auth", {}).get("hashing_string")
+    # CLI argument takes highest precedence
+    if cli_key:
+        logger.info("Using hashing key from CLI argument")
+        return cli_key
 
-    if not hashing_string:
-        # Fallback to SHA1 hash of config data as a system property
-        cfg_str = json.dumps(cfg, sort_keys=True)
-        hashing_string = hashlib.sha1(cfg_str.encode()).hexdigest()
-        logger.warning(
-            "auth.hashing_string is not configured. "
-            "Using SHA1 hash of config as fallback."
-        )
+    # Environment variable takes second precedence
+    if env_key:
+        logger.info("Using hashing key from environment variable")
+        return env_key
+
+    # Fallback to SHA1 hash of config data as a system property
+    cfg_str = json.dumps(cfg, sort_keys=True)
+    hashing_string = hashlib.sha1(cfg_str.encode()).hexdigest()
+    logger.warning(
+        "No hashing key provided via CLI or environment variable. "
+        "Using SHA1 hash of config as fallback."
+    )
 
     return hashing_string
 
@@ -153,8 +166,36 @@ def load_htpasswd_file(htpasswd_path: str) -> HtpasswdFile:
         sys.exit(1)
 
 
-cfg = load_config()
-hashing_string = validate_and_init_hashing_string(cfg)
+def parse_cli_args():
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description="homelab-auth: Home Lab Authentication Service"
+    )
+    parser.add_argument(
+        "config_file",
+        nargs="?",
+        default="config.yaml",
+        help="Path to configuration file (default: config.yaml)",
+    )
+    parser.add_argument(
+        "--hashing-key",
+        help="Hashing key for session signing (takes precedence over config)",
+        default=None,
+    )
+    return parser.parse_args()
+
+
+cfg_file = None
+cli_args = parse_cli_args()
+cfg_file = cli_args.config_file
+cfg = load_config(cfg_file)
+
+# Get hashing key from environment variable if available
+env_hashing_key = os.getenv("HOMELAB_AUTH_HASHING_KEY")
+
+hashing_string = validate_and_init_hashing_string(
+    cfg, cli_args.hashing_key, env_hashing_key
+)
 
 # Log only the hash and length of the hashing_string for audit purposes,
 # never log the actual value to prevent exposure in DEBUG logs or exception tracebacks

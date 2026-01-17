@@ -14,6 +14,40 @@ The homelab-auth application implements a simple OIDC-like authentication servic
 
 ---
 
+## Configuration & Deployment
+
+### Session Signing Key Management
+
+The application supports three methods for providing the session signing key (in order of precedence):
+
+1. CLI Argument (highest priority - best for single instances)
+
+```bash
+python src/main.py config.yaml --hashing-key "your-secure-key"
+```
+
+1. Environment Variable (recommended for containers/orchestration)
+
+```bash
+export HOMELAB_AUTH_HASHING_KEY="your-secure-key"
+python src/main.py config.yaml
+```
+
+1. Fallback (lowest priority - automatic, least secure)
+
+If neither CLI nor environment variable is provided, the application uses a SHA1 hash of the configuration file.
+
+**Security Recommendations**:
+
+- ✅ For production: Use environment variable (best with secrets management: Kubernetes Secrets, Docker Secrets, etc.)
+- ✅ For development: Use CLI argument or environment variable
+- ✅ Key should be at least 32 bytes of random data: `openssl rand -base64 32`
+- ✅ Ensure config files have restricted permissions (600)
+- ✅ Rotate keys periodically in long-lived deployments
+- ⚠️ Avoid using configuration file for key storage (fallback only)
+
+---
+
 ## Critical Issues (Resolved)
 
 ### 1. **Cryptographic Key Material Exposed in Logs and Version Control** ✅ FIXED
@@ -535,7 +569,7 @@ dependencies = [
     "Flask>=3.0.0",
     "PyYAML>=6.0.1",
     "passlib>=1.7.4",
-    "bcrypt==3.2.2",
+    "bcrypt==4.3.0",
     "itsdangerous>=2.1.0",
     "gunicorn>=21.2.0"
 ]
