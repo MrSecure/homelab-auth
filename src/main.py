@@ -5,6 +5,8 @@ homelab-auth script entrypoint
 
 import sys
 import logging
+import argparse
+import os
 
 # Setup logging early to suppress passlib warnings
 # noqa: E402
@@ -19,7 +21,12 @@ from pathlib import Path
 from flask import Flask, request, make_response, redirect, render_template_string
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 from passlib.apache import HtpasswdFile
-from itsdangerous import TimestampSigner, BadSignature, SignatureExpired
+from itsdangerous import (
+    TimestampSigner,
+    BadSignature,
+    SignatureExpired,
+    URLSafeTimedSerializer,
+)
 from urllib.parse import urlparse
 
 # --- FIX: Passlib/Bcrypt 4.0+ Compatibility ---
@@ -103,28 +110,39 @@ def load_config(config_file: str = "config.yaml") -> dict:
         sys.exit(1)
 
 
-def validate_and_init_hashing_string(cfg: dict) -> str:
+def validate_and_init_hashing_string(
+    cfg: dict, cli_key: str = None, env_key: str = None
+) -> str:
     """
-    Validate auth.hashing_string is configured.
+    Validate and initialize the hashing string for session signing.
     Returns the hashing string to use.
-    Falls back to SHA1 hash of config if not explicitly configured.
+    Falls back to SHA1 hash of config if not explicitly configured via CLI or environment.
 
     Args:
         cfg: Configuration dictionary
+        cli_key: Optional hashing key from CLI argument
+        env_key: Optional hashing key from environment variable
 
     Returns:
         The hashing string to use for signing
     """
-    hashing_string = cfg.get("auth", {}).get("hashing_string")
+    # CLI argument takes highest precedence
+    if cli_key:
+        logger.info("Using hashing key from CLI argument")
+        return cli_key
 
-    if not hashing_string:
-        # Fallback to SHA1 hash of config data as a system property
-        cfg_str = json.dumps(cfg, sort_keys=True)
-        hashing_string = hashlib.sha1(cfg_str.encode()).hexdigest()
-        logger.warning(
-            "auth.hashing_string is not configured. "
-            "Using SHA1 hash of config as fallback."
-        )
+    # Environment variable takes second precedence
+    if env_key:
+        logger.info("Using hashing key from environment variable")
+        return env_key
+
+    # Fallback to SHA1 hash of config data as a system property
+    cfg_str = json.dumps(cfg, sort_keys=True)
+    hashing_string = hashlib.sha1(cfg_str.encode()).hexdigest()
+    logger.warning(
+        "No hashing key provided via CLI or environment variable. "
+        "Using SHA1 hash of config as fallback."
+    )
 
     return hashing_string
 
@@ -153,8 +171,36 @@ def load_htpasswd_file(htpasswd_path: str) -> HtpasswdFile:
         sys.exit(1)
 
 
-cfg = load_config()
-hashing_string = validate_and_init_hashing_string(cfg)
+def parse_cli_args():
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description="homelab-auth: Home Lab Authentication Service"
+    )
+    parser.add_argument(
+        "config_file",
+        nargs="?",
+        default="config.yaml",
+        help="Path to configuration file (default: config.yaml)",
+    )
+    parser.add_argument(
+        "--hashing-key",
+        help="Hashing key for session signing (takes precedence over config)",
+        default=None,
+    )
+    return parser.parse_args()
+
+
+cfg_file = None
+cli_args = parse_cli_args()
+cfg_file = cli_args.config_file
+cfg = load_config(cfg_file)
+
+# Get hashing key from environment variable if available
+env_hashing_key = os.getenv("HOMELAB_AUTH_HASHING_KEY")
+
+hashing_string = validate_and_init_hashing_string(
+    cfg, cli_args.hashing_key, env_hashing_key
+)
 
 # Log only the hash and length of the hashing_string for audit purposes,
 # never log the actual value to prevent exposure in DEBUG logs or exception tracebacks
@@ -167,6 +213,7 @@ logger.debug(
 # Create signer immediately and clear the key material from module scope
 # to prevent accidental exposure in exception tracebacks or log statements
 signer = TimestampSigner(hashing_string)
+csrf_serializer = URLSafeTimedSerializer(hashing_string)
 del hashing_string  # Explicitly remove the cryptographic material from module scope
 
 users = load_htpasswd_file(cfg["auth"]["htpasswd_path"])
@@ -236,7 +283,63 @@ def is_safe_redirect(target_url):
         return False
 
 
-def render_login_template(title: str, feedback: str = None) -> str:
+def generate_csrf_token(remote_addr: str) -> str:
+    """
+    Generate a CSRF token for the current session.
+
+    Args:
+        remote_addr: The remote address/IP of the client
+
+    Returns:
+        A signed CSRF token
+
+    Raises:
+        Exception: If token generation fails
+    """
+    try:
+        token = csrf_serializer.dumps(remote_addr)
+        logger.debug("Generated CSRF token for client: %s", remote_addr)
+        return token
+    except Exception as e:
+        logger.error("Failed to generate CSRF token: %s", e)
+        raise
+
+
+def validate_csrf_token(token: str, remote_addr: str, max_age: int = 3600) -> bool:
+    """
+    Validate a CSRF token.
+
+    Args:
+        token: The CSRF token to validate
+        remote_addr: The remote address/IP of the client
+        max_age: Maximum age of token in seconds (default: 1 hour)
+
+    Returns:
+        True if token is valid, False otherwise
+    """
+    if not token:
+        logger.warning("CSRF token validation failed: token is empty")
+        return False
+
+    try:
+        stored_addr = csrf_serializer.loads(token, max_age=max_age)
+        if stored_addr == remote_addr:
+            logger.debug("CSRF token validation successful for client: %s", remote_addr)
+            return True
+        logger.warning(
+            "CSRF token validation failed: client address mismatch (expected: %s, got: %s)",
+            stored_addr,
+            remote_addr,
+        )
+        return False
+    except Exception as e:
+        logger.warning("CSRF token validation failed: %s", e)
+        return False
+
+
+def render_login_template(
+    title: str, feedback: str = None, csrf_token: str = None
+) -> str:
     """
     Render the login page template.
 
@@ -247,6 +350,7 @@ def render_login_template(title: str, feedback: str = None) -> str:
     Args:
         title: Page title to pass to the template
         feedback: Optional error or feedback message to display
+        csrf_token: CSRF token to include in the form
 
     Returns:
         Rendered HTML string
@@ -265,7 +369,9 @@ def render_login_template(title: str, feedback: str = None) -> str:
             env = Environment(loader=FileSystemLoader(template_dir))
             template = env.get_template(template_name)
             logger.info("Loaded login template from: %s", path)
-            return template.render(title=title, advisory=advisory, feedback=feedback)
+            return template.render(
+                title=title, advisory=advisory, feedback=feedback, csrf_token=csrf_token
+            )
 
         except ValueError as e:
             logger.warning(
@@ -283,7 +389,11 @@ def render_login_template(title: str, feedback: str = None) -> str:
     # Fallback to built-in template
     logger.debug("Using built-in LOGIN_FORM template")
     return render_template_string(
-        LOGIN_FORM, title=title, advisory=advisory, feedback=feedback
+        LOGIN_FORM,
+        title=title,
+        advisory=advisory,
+        feedback=feedback,
+        csrf_token=csrf_token,
     )
 
 
@@ -296,6 +406,7 @@ LOGIN_FORM = """
     <div style="border: 1px solid #ccc; padding: 20px; border-radius: 8px; max-width: 400px;">
         <h2>{{ title | escape }}</h2>
         <form method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token | escape }}">
             <input type="text" name="user" placeholder="Username" required><br><br>
             <input type="password" name="pw" placeholder="Password" required><br><br>
             <button type="submit" style="width: 100%;">Login</button>
@@ -355,6 +466,18 @@ def login():
             pass  # Continue to login form
 
     if request.method == "POST":
+        # Validate CSRF token on POST request
+        csrf_token = request.form.get("csrf_token", "").strip()
+        if not validate_csrf_token(csrf_token, request.remote_addr):
+            logger.warning(
+                "Login attempt with invalid CSRF token from %s", request.remote_addr
+            )
+            return render_login_template(
+                cfg["page"]["title"],
+                feedback="Invalid form submission. Please try again.",
+                csrf_token=generate_csrf_token(request.remote_addr),
+            ), 400
+
         username = request.form.get("user", "").strip()
         password = request.form.get("pw", "")
 
@@ -364,7 +487,9 @@ def login():
                 "Login attempt with missing credentials from %s", request.remote_addr
             )
             return render_login_template(
-                cfg["page"]["title"], feedback="Invalid Credentials."
+                cfg["page"]["title"],
+                feedback="Invalid Credentials.",
+                csrf_token=generate_csrf_token(request.remote_addr),
             ), 401
 
         # Prevent oversized input attacks
@@ -373,7 +498,9 @@ def login():
                 "Login attempt with oversized input from %s", request.remote_addr
             )
             return render_login_template(
-                cfg["page"]["title"], feedback="Invalid Credentials."
+                cfg["page"]["title"],
+                feedback="Invalid Credentials.",
+                csrf_token=generate_csrf_token(request.remote_addr),
             ), 401
 
         if users.check_password(username, password):
@@ -398,10 +525,14 @@ def login():
             "Failed login attempt for user: %s from %s", username, request.remote_addr
         )
         return render_login_template(
-            cfg["page"]["title"], feedback="Invalid Credentials."
+            cfg["page"]["title"],
+            feedback="Invalid Credentials.",
+            csrf_token=generate_csrf_token(request.remote_addr),
         ), 401
 
-    return render_login_template(cfg["page"]["title"])
+    # Generate CSRF token for GET request
+    csrf_token = generate_csrf_token(request.remote_addr)
+    return render_login_template(cfg["page"]["title"], csrf_token=csrf_token)
 
 
 @app.route("/verify", methods=["GET"])

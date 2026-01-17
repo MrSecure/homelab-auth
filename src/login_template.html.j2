@@ -274,6 +274,7 @@
             <h1>{{ title | escape }}</h1>
         </div>
         <form method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token | escape }}">
             <div class="form-group">
                 <label for="user">Username</label>
                 <input type="text" id="user" name="user" placeholder="Enter your username" required autofocus>

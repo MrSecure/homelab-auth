@@ -39,6 +39,38 @@ task run
 
 This starts the Flask development server on `http://127.0.0.1:55000`.
 
+## Configuration
+
+### Session Hashing Key
+
+The session signing key can be provided in three ways (in order of precedence):
+
+1. **CLI Argument** (highest priority):
+
+```bash
+python src/main.py config.yaml --hashing-key "your-secret-key"
+```
+
+2. **Environment Variable**:
+
+```bash
+export HOMELAB_AUTH_HASHING_KEY="your-secret-key"
+python src/main.py config.yaml
+```
+
+3. **Fallback** (default):
+
+If neither CLI argument nor environment variable is provided, the application will use a SHA1 hash of the configuration file as the signing key.
+
+For Docker deployments, use the environment variable:
+
+```bash
+docker run --rm -ti \
+  -e HOMELAB_AUTH_HASHING_KEY="your-secret-key" \
+  -p 55000:55000 \
+  MrSecure/homelab-auth:0.8.0
+```
+
 ## Optional setup
 
 If you'd like to be able to run `task license-check` locally, you will need to install `grant` and ensure it's in your `PATH`.
