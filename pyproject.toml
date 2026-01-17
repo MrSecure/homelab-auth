@@ -1,6 +1,6 @@
 [project]
 name = "homelab_auth"
-version = "0.8.0"
+version = "0.8.1"
 description = "Home Lab Auth"
 authors = [
     { name = "MrSecure", email = "MrSecre@home.arpa" }
