@@ -4,6 +4,13 @@ homelab-auth script entrypoint
 """
 
 import sys
+import logging
+
+# Setup logging early to suppress passlib warnings
+# noqa: E402
+logging.basicConfig()
+logging.getLogger("passlib.handlers.bcrypt").setLevel(logging.CRITICAL)
+
 import json
 import yaml
 import bcrypt
@@ -14,7 +21,6 @@ from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 from passlib.apache import HtpasswdFile
 from itsdangerous import TimestampSigner, BadSignature, SignatureExpired
 from urllib.parse import urlparse
-import logging
 
 # --- FIX: Passlib/Bcrypt 4.0+ Compatibility ---
 if not hasattr(bcrypt, "__about__"):
