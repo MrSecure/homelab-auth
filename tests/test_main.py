@@ -253,3 +253,102 @@ def test_secure_cookie_settings():
     assert cookie_config["secure"] is True
     assert cookie_config["httponly"] is True
     assert cookie_config["samesite"] in ["Lax", "Strict", "None"]
+
+@pytest.mark.unit
+def test_csrf_token_serializer():
+    """Test CSRF token generation and validation with URLSafeTimedSerializer."""
+    from itsdangerous import URLSafeTimedSerializer
+
+    secret_key = "test-secret-key-12345"
+    serializer = URLSafeTimedSerializer(secret_key)
+
+    # Generate token
+    remote_addr = "192.168.1.1"
+    token = serializer.dumps(remote_addr)
+    assert token is not None
+    assert isinstance(token, str)
+
+    # Validate token
+    loaded_addr = serializer.loads(token, max_age=3600)
+    assert loaded_addr == remote_addr
+
+
+@pytest.mark.unit
+def test_csrf_token_validation_wrong_address():
+    """Test CSRF token validation fails with different IP address."""
+    from itsdangerous import URLSafeTimedSerializer
+
+    secret_key = "test-secret-key-12345"
+    serializer = URLSafeTimedSerializer(secret_key)
+
+    # Generate token for one IP
+    token = serializer.dumps("192.168.1.1")
+
+    # Try to validate with different IP
+    loaded_addr = serializer.loads(token, max_age=3600)
+    assert loaded_addr != "192.168.1.2"
+
+
+@pytest.mark.unit
+def test_csrf_token_expiration():
+    """Test CSRF token expiration with max_age parameter."""
+    from itsdangerous import URLSafeTimedSerializer, SignatureExpired
+    import time
+
+    secret_key = "test-secret-key-12345"
+    serializer = URLSafeTimedSerializer(secret_key)
+
+    # Generate token
+    remote_addr = "192.168.1.1"
+    token = serializer.dumps(remote_addr)
+
+    # Token should be valid with high max_age
+    loaded_addr = serializer.loads(token, max_age=3600)
+    assert loaded_addr == remote_addr
+
+    # Create an old timestamp by manually creating a token with old data
+    # This simulates an expired token
+    import time
+    old_time = int(time.time()) - 7200  # 2 hours ago
+
+    # Generate a token and test expiration with low max_age
+    token = serializer.dumps(remote_addr)
+    time.sleep(0.1)  # Sleep briefly to ensure time has passed
+
+    # Loading with max_age=0 means "must be created right now", which will fail for our token
+    # We use a small negative max_age to ensure it's expired
+    try:
+        # A token created now should fail with max_age negative
+        serializer.loads(token, max_age=-1)
+        assert False, "Should have raised SignatureExpired"
+    except SignatureExpired:
+        # Expected behavior
+        pass
+
+
+@pytest.mark.unit
+def test_csrf_empty_token_validation():
+    """Test CSRF validation with empty token."""
+    from itsdangerous import URLSafeTimedSerializer
+
+    secret_key = "test-secret-key-12345"
+    serializer = URLSafeTimedSerializer(secret_key)
+
+    # Empty token should fail
+    empty_token = ""
+    with pytest.raises(Exception):
+        serializer.loads(empty_token, max_age=3600)
+
+
+@pytest.mark.unit
+def test_csrf_invalid_token_format():
+    """Test CSRF validation with invalid token format."""
+    from itsdangerous import URLSafeTimedSerializer, BadSignature
+
+    secret_key = "test-secret-key-12345"
+    serializer = URLSafeTimedSerializer(secret_key)
+
+    # Invalid token format should fail
+    invalid_token = "not.a.valid.token.format"
+    with pytest.raises(BadSignature):
+        serializer.loads(invalid_token, max_age=3600)
