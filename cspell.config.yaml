@@ -1,0 +1,13 @@
+version: "0.2"
+ignorePaths: []
+dictionaryDefinitions: []
+dictionaries: []
+words:
+  - conftest
+  - docstrings
+  - homelab
+  - httponly
+  - Taskfile
+  - unsign
+ignoreWords: []
+import: []

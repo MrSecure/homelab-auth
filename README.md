@@ -18,7 +18,7 @@ task init
 task build
 
 # Run the image
-docker run --rm -ti -p 55000:55000 MrSecure/homelab-auth:0.0.0
+docker run --rm -ti -p 55000:55000 MrSecure/homelab-auth:0.8.0
 ```
 
 If you'd like to build all of the supported docker images, you can set the `PLATFORM` env var to `all` like this:
@@ -28,6 +28,16 @@ PLATFORM=all task build
 ```
 
 You can also specify a single platform of either `linux/arm64` or `linux/amd64`
+
+## Development
+
+For local development, you can run the service directly with:
+
+```bash
+task run
+```
+
+This starts the Flask development server on `http://127.0.0.1:55000`.
 
 ## Optional setup
 
@@ -40,6 +50,10 @@ If you're troubleshooting the results of any of the tasks, you can add `-v` to e
 ```bash
 task -v build
 ```
+
+## API Endpoints
+
+- **GET/POST `/logout`** - Invalidates the user session cookie and logs out the user
 
 ## Automated Dependency Management
 
