@@ -5,11 +5,15 @@ dictionaries: []
 words:
   - conftest
   - docstrings
+  - healthcheck
   - homelab
   - httponly
+  - logformat
   - setex
   - Taskfile
   - unsign
+  - websecure
   - wsgi
+  - containo
 ignoreWords: []
 import: []

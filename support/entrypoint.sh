@@ -41,4 +41,4 @@ exec gunicorn \
     --graceful-timeout 10 \
     --error-logfile - \
     --access-logfile - \
-    main:app
+    wsgi:app

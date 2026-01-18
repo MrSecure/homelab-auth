@@ -190,6 +190,14 @@ tasks:
     cmds:
       - '{{.RUN_SCRIPT}} python ../src/main.py config.yaml --hashing-key homelab-auth-dev-key'
 
+  run-gunicorn:
+    desc: Run the service with gunicorn
+    env:
+      HOMELAB_AUTH_CONFIG_FILE: support/wsgi-config.yaml
+      HOMELAB_AUTH_HASHING_KEY: homelab-auth-dev-key
+    cmds:
+      - '{{.RUN_SCRIPT}} gunicorn --bind 0.0.0.0:8000 --workers 4 --timeout 120 --access-logfile - --error-logfile - src.wsgi:app'
+
   clean:
     desc: Clean up build artifacts, cache files/directories, temp files, etc.
     cmds:
@@ -236,6 +244,7 @@ tasks:
 
   vulnscan:
     desc: Vuln scan the SBOM
+    deps: ["sbom"]
     cmds:
       - |
         {{.RUN_SCRIPT}} {{.SCRIPTS_DIR}}/scan_image.py vulnscan \

@@ -1,0 +1,26 @@
+# WSGI configuration for Home Lab Auth service
+# for use when running task run-gunicorn
+auth:
+  htpasswd_path: support/users.htpasswd
+  session_max_age: 43200
+cookie:
+  name: pecan_sandy
+  secure: true
+  httponly: true
+  samesite: Lax
+  domain: null
+  allowed_hosts:
+  - dev.home.arpa
+  - labs.home.arpa
+server:
+  port: 55000
+  host: 0.0.0.0
+redir:
+  external_name: auth
+  default_destination: dashboard
+page:
+  template_path: login_template.html.j2
+  title: Home Lab Access
+  advisory: |
+    This system is for authorized users only. All activities are monitored and recorded.
+    Unauthorized access is prohibited and may be subject to criminal prosecution.
