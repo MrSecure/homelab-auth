@@ -5,6 +5,7 @@ dictionaries: []
 words:
   - conftest
   - docstrings
+  - healthcheck
   - homelab
   - httponly
   - setex
