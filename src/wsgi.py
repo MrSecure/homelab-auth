@@ -31,7 +31,11 @@ if os.getenv("HOMELAB_AUTH_HASHING_KEY"):
     sys.argv.extend(["--hashing-key", os.getenv("HOMELAB_AUTH_HASHING_KEY")])
 
 # Now import main which will parse our controlled argv
-from src.main import app
+# Try to import from src.main first (local development), fall back to main (Docker)
+try:
+    from src.main import app
+except ModuleNotFoundError:
+    from main import app
 
 # Export the app for gunicorn
 __all__ = ["app"]
