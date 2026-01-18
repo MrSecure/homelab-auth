@@ -14,5 +14,6 @@ words:
   - unsign
   - websecure
   - wsgi
+  - containo
 ignoreWords: []
 import: []
