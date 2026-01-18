@@ -244,6 +244,7 @@ tasks:
 
   vulnscan:
     desc: Vuln scan the SBOM
+    deps: ["sbom"]
     cmds:
       - |
         {{.RUN_SCRIPT}} {{.SCRIPTS_DIR}}/scan_image.py vulnscan \
