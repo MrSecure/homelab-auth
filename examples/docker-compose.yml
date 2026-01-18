@@ -14,5 +14,8 @@ services:
       - ./config.yaml:/app/config.yaml:ro
       - ./users.htpasswd:/app/users.htpasswd:ro
     environment:
-      # Optional: Override Gunicorn settings via environment variables
-      - GUNICORN_CMD_ARGS=--workers 4 --bind 0.0.0.0:55000 --access-logfile -
+      - HOMELAB_AUTH_CONFIG_FILE=/app/config.yaml
+      - HOMELAB_AUTH_HASHING_KEY='ThisIsADevKeyForHomelabAuth'
+
+    #   # Optional: Override Gunicorn settings via environment variables
+    #   - GUNICORN_CMD_ARGS=--workers 4 --bind 0.0.0.0:55000 --access-logfile -
