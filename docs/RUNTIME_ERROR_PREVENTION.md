@@ -36,6 +36,19 @@ Enhanced worker configuration for production stability:
 
 ## How This Prevents Errors
 
+### WSGI Entrypoint (src/wsgi.py)
+
+`src/wsgi.py` provides a production-ready WSGI entrypoint intended for use with servers like `gunicorn`.
+
+- It initializes logging early and applies a compatibility shim for newer `bcrypt`/`passlib` versions so worker startup does not raise import-time warnings or errors.
+- For initialization it sets `sys.argv` to a controlled value using the `HOMELAB_AUTH_CONFIG_FILE` environment variable (defaults to `config.yaml`) and will append a `--hashing-key` argument when `HOMELAB_AUTH_HASHING_KEY` is set. This lets the same configuration-loading code in `src/main.py` run in both CLI and WSGI contexts without parsing unexpected arguments.
+- Exported symbol: `app` (the Flask application) — WSGI servers should point to `src.wsgi:app` (or `wsgi:app` when running inside the container image).
+
+Deployment notes:
+- Ensure the configured config file path is readable by the WSGI process.
+- Prefer setting `HOMELAB_AUTH_HASHING_KEY` in production to avoid the config-based SHA1 fallback, which will change if the config file contents change and can invalidate sessions.
+- The container `support/entrypoint.sh` demonstrates a recommended `gunicorn` invocation that uses `wsgi:app`.
+
 1. **Timeout Protection**: Worker timeouts prevent hung connections from accumulating
 2. **Request Size Limits**: Prevents memory exhaustion from oversized payloads
 3. **Graceful Degradation**: Error handlers return proper HTTP status codes instead of crashes
