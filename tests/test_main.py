@@ -145,56 +145,42 @@ def test_get_cookie_subdomain_logic():
 
 
 @pytest.mark.unit
-def test_get_safe_redirect_url_relative_path():
-    """Test get_safe_redirect_url accepts relative URLs."""
-    target = "/done"
-    # Relative URLs should be safe
-    assert target.startswith("/")
+def test_get_safe_redirect_url_relative_path(tmp_path, monkeypatch):
+    """Test get_safe_redirect_url accepts relative paths and rejects protocol-relative URLs."""
+    main_module = load_main_module(tmp_path, monkeypatch)
+    fn = main_module.get_safe_redirect_url
 
-    target = "/login"
-    assert target.startswith("/")
+    # Plain relative paths are safe - returned as-is
+    assert fn("/done", "/default") == "/done"
+    assert fn("/login", "/default") == "/login"
 
+    # Protocol-relative URLs (//evil.com) must be rejected, even though they start with "/"
+    assert fn("//evil.com/steal", "/default") == "/default"
+    assert fn("//attacker.com", "/default") == "/default"
 
-@pytest.mark.unit
-def test_get_safe_redirect_url_rejects_protocol_relative_urls():
-    """Test get_safe_redirect_url rejects protocol-relative URLs like //evil.com."""
-    # Protocol-relative URLs start with // and resolve to external hosts
-    target = "//evil.com/steal"
-    is_safe = target.startswith("/") and not target.startswith("//")
-    assert is_safe is False
-
-    target = "//attacker.com"
-    is_safe = target.startswith("/") and not target.startswith("//")
-    assert is_safe is False
+    # Empty URL returns the default
+    assert fn("", "/default") == "/default"
 
 
 @pytest.mark.unit
-def test_get_safe_redirect_url_absolute_domain_matching():
-    """Test get_safe_redirect_url domain matching logic."""
-    from urllib.parse import urlparse
+def test_get_safe_redirect_url_absolute_domain_matching(tmp_path, monkeypatch):
+    """Test get_safe_redirect_url allows same-domain URLs and blocks external ones."""
+    main_module = load_main_module(tmp_path, monkeypatch)
+    fn = main_module.get_safe_redirect_url
+    default = "https://dashboard.example.com"
 
-    # Test safe absolute URL
-    target_url = "https://sub.example.com/page"
-    cookie_domain = ".example.com"
+    with main_module.app.test_request_context("/"):
+        # Same domain and subdomains are allowed (cookie domain is .example.com)
+        assert fn("https://sub.example.com/page", default) == "https://sub.example.com/page"
+        assert fn("https://example.com/page", default) == "https://example.com/page"
 
-    parsed = urlparse(target_url)
-    target_host = parsed.netloc.lower()
-    cookie_domain_clean = cookie_domain.lstrip(".")
+        # External domains must fall back to default
+        assert fn("https://attacker.com/page", default) == default
+        assert fn("https://evil.example.com.attacker.com/page", default) == default
 
-    # Should match if it's the domain or a subdomain
-    is_safe = target_host == cookie_domain_clean or target_host.endswith(cookie_domain)
-    assert is_safe is True
-
-    # Test unsafe absolute URL
-    target_url_unsafe = "https://attacker.com/page"
-    parsed_unsafe = urlparse(target_url_unsafe)
-    target_host_unsafe = parsed_unsafe.netloc.lower()
-
-    is_unsafe = (
-        target_host_unsafe == cookie_domain_clean
-        or target_host_unsafe.endswith(cookie_domain)
-    )
-    assert is_unsafe is False
+        # Non-http/https schemes are rejected
+        assert fn("javascript:alert(1)", default) == default
+        assert fn("data:text/html,<b>x</b>", default) == default
 
 
 @pytest.mark.unit
