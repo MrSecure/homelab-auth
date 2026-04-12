@@ -18,7 +18,7 @@ import yaml
 import bcrypt
 import hashlib
 from pathlib import Path
-from flask import Flask, request, make_response, redirect, render_template_string
+from flask import Flask, request, make_response, redirect, render_template_string, jsonify
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 from passlib.apache import HtpasswdFile
 from itsdangerous import (
@@ -259,8 +259,8 @@ def is_safe_redirect(target_url):
     Validate that the redirect URL's domain is within the cookie domain.
     Returns True if safe, False otherwise.
     """
-    if target_url.startswith("/"):
-        return True  # Relative URLs are safe
+    if target_url.startswith("/") and not target_url.startswith("//"):
+        return True  # Relative URLs are safe (protocol-relative URLs like //evil.com are not)
 
     try:
         parsed = urlparse(target_url)
@@ -574,7 +574,7 @@ def cookie_crumbling_protocol_v2():
             "cookie_exchange endpoint accessed but is disabled in configuration from %s",
             request.remote_addr,
         )
-        return {"error": "Not Found"}, 404
+        return jsonify({"error": "Not Found"}), 404
 
     signed_cookie = request.cookies.get(cfg["cookie"]["name"])
     if not signed_cookie:
@@ -583,7 +583,7 @@ def cookie_crumbling_protocol_v2():
             request.remote_addr,
         )
         # Return 400 instead of 401 to prevent traefik-level auth loops
-        return {"error": "Unauthorized"}, 400
+        return jsonify({"error": "Unauthorized"}), 400
 
     try:
         identity = signer.unsign(
@@ -594,19 +594,19 @@ def cookie_crumbling_protocol_v2():
             identity,
             request.remote_addr,
         )
-        return {
+        return jsonify({
             "token": signed_cookie,
             "identity": identity,
             "cookie": cfg["cookie"]["name"],
             "header": cfg.get("header", {}).get("name", "X-HomeLab-Misconfigured"),
-        }, 200
+        }), 200
     except (BadSignature, SignatureExpired):
         logger.debug(
             "cookie_exchange endpoint accessed with invalid session cookie from %s",
             request.remote_addr,
         )
         # Return 400 instead of 401 to prevent traefik-level auth loops
-        return {"error": "Invalid Session"}, 400
+        return jsonify({"error": "Invalid Session"}), 400
 
 
 @app.route("/logout", methods=["GET", "POST"])
