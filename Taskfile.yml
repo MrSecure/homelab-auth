@@ -204,6 +204,10 @@ tasks:
       - rm -rf .pytest_cache
       - rm -rf htmlcov
       - rm -rf .coverage
+      - rm -rf tmp/.pytest_cache
+      - rm -rf tmp/htmlcov
+      - rm -rf tmp/.coverage
+      - rm -f tmp/coverage.xml
       - rm -rf dist
       - rm -rf build
       - rm -rf *.egg-info

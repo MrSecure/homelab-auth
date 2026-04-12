@@ -38,8 +38,9 @@ src_paths = ["src", "tests"]
 plugins = []
 
 [tool.pytest.ini_options]
-addopts = "--cov=src/homelab_auth --cov-append --no-cov-on-fail --cov-fail-under=0 --cov-report=html --cov-report=xml --cov-report=term-missing"
+addopts = "--cov=src/homelab_auth --cov-append --no-cov-on-fail --cov-fail-under=0 --cov-report=html:tmp/htmlcov --cov-report=xml:tmp/coverage.xml --cov-report=term-missing"
 pythonpath = ['src']
+cache_dir = "tmp/.pytest_cache"
 markers = [
     "unit: marks tests as unit tests (deselect with '-m \"not unit\"')",
     "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
@@ -62,6 +63,9 @@ dev = [
     "PyYAML>=6.0.1",
     "refurb",
 ]
+
+[tool.coverage.run]
+data_file = "tmp/.coverage"
 
 [tool.coverage.report]
 fail_under = 80
