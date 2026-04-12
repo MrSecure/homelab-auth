@@ -18,7 +18,14 @@ import yaml
 import bcrypt
 import hashlib
 from pathlib import Path
-from flask import Flask, request, make_response, redirect, render_template_string, jsonify
+from flask import (
+    Flask,
+    request,
+    make_response,
+    redirect,
+    render_template_string,
+    jsonify,
+)
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 from passlib.apache import HtpasswdFile
 from itsdangerous import (
@@ -606,12 +613,14 @@ def cookie_crumbling_protocol_v2():
             identity,
             request.remote_addr,
         )
-        return jsonify({
-            "token": signed_cookie,
-            "identity": identity,
-            "cookie": cfg["cookie"]["name"],
-            "header": cfg.get("header", {}).get("name", "X-HomeLab-Misconfigured"),
-        }), 200
+        return jsonify(
+            {
+                "token": signed_cookie,
+                "identity": identity,
+                "cookie": cfg["cookie"]["name"],
+                "header": cfg.get("header", {}).get("name", "X-HomeLab-Misconfigured"),
+            }
+        ), 200
     except (BadSignature, SignatureExpired):
         logger.debug(
             "cookie_exchange endpoint accessed with invalid session cookie from %s",
