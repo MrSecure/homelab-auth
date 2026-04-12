@@ -55,7 +55,6 @@ task init                # Set up development environment
 task build              # Build the project
 task test               # Run all tests
 task lint               # Check code quality
-task format             # Auto-format code
 ```
 
 ### Before Committing
@@ -214,7 +213,6 @@ def main():
 - `task build`: Build the project
 - `task test`: Run tests with coverage
 - `task lint`: Run all linters
-- `task format`: Auto-format code
 - `task security-scan`: Check for vulnerabilities
 - `task docker-build`: Build Docker image
 - `task docker-run`: Run in Docker container

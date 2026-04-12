@@ -105,6 +105,12 @@ token = { env = "GH_TOKEN" }
 ignore_token_for_push = false
 insecure = false
 
+[tool.bandit]
+# Only report Medium and High severity findings.
+severity = ["MEDIUM", "HIGH"]
+targets = ["src"]
+exclude_dirs = ["tests"]
+
 [tool.ruff]
 target-version = "py311"
 extend-exclude = ["tests/*"]

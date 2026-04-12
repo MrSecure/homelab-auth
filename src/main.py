@@ -26,7 +26,7 @@ from flask import (
     render_template_string,
     jsonify,
 )
-from jinja2 import Environment, FileSystemLoader, TemplateNotFound
+from jinja2 import Environment, FileSystemLoader, TemplateNotFound, select_autoescape
 from passlib.apache import HtpasswdFile
 from itsdangerous import (
     TimestampSigner,
@@ -145,7 +145,7 @@ def validate_and_init_hashing_string(
 
     # Fallback to SHA1 hash of config data as a system property
     cfg_str = json.dumps(cfg, sort_keys=True)
-    hashing_string = hashlib.sha1(cfg_str.encode()).hexdigest()
+    hashing_string = hashlib.sha1(cfg_str.encode(), usedforsecurity=False).hexdigest()
     logger.warning(
         "No hashing key provided via CLI or environment variable. "
         "Using SHA1 hash of config as fallback."
@@ -395,7 +395,10 @@ def render_login_template(
             template_name = path.name
 
             # Create Jinja2 environment and load template
-            env = Environment(loader=FileSystemLoader(template_dir))
+            env = Environment(
+                loader=FileSystemLoader(template_dir),
+                autoescape=select_autoescape(["html", "htm", "xml"]),
+            )
             template = env.get_template(template_name)
             logger.info("Loaded login template from: %s", path)
             return template.render(

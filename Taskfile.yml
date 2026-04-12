@@ -81,6 +81,16 @@ tasks:
       - '{{.RUN_SCRIPT}} pre-commit validate-manifest'
       - '{{.RUN_SCRIPT}} python scripts/validate_service_definition.py'
 
+  security-scan:
+    desc: Perform static security analysis on application code (excluding tests)
+    cmds:
+      - |
+        uvx --from 'bandit[toml]' bandit \
+          -r src \
+          -x tests \
+          -ii \
+          -lll
+
   build:
     desc: Build the project; docker images, compiled binaries, etc.
     vars:
