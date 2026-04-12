@@ -32,7 +32,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           python-version: ${{ env.python_version }}
       - name: Set up QEMU for cross-platform emulation
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
       - name: Install license compliance tool
         run: |
           mkdir -p "${RUNNER_TEMP}/bin"
@@ -81,7 +81,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           python-version: ${{ env.python_version }}
       - name: Set up QEMU for cross-platform emulation
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
       - name: Build Docker image
         run: task -v build
         env:
