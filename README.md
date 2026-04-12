@@ -145,56 +145,14 @@ task -v build
 
 ## API Endpoints
 
-- **GET/POST `/logout`** - Invalidates the user session cookie and logs out the user
-
-- **GET `/cookie-crumbling-protocol-v2`** - Returns authenticated user's token and identity
-
-  This endpoint verifies the user's session cookie and returns both the token value and authenticated user identity. This is useful for applications that need to exchange the session cookie for additional token data.
-
-  **Response (success - HTTP 200):**
-  ```json
-  {
-    "token": "signed.cookie.value",
-    "identity": "username"
-  }
-  ```
-
-  **Response (unauthorized - HTTP 401):**
-  ```json
-  {
-    "error": "Unauthorized"
-  }
-  ```
-
-  **Response (invalid session - HTTP 401):**
-  ```json
-  {
-    "error": "Invalid Session"
-  }
-  ```
-
-  **Response (disabled - HTTP 404):**
-  ```json
-  {
-    "error": "Not Found"
-  }
-  ```
-
-  **Configuration:**
-
-  By default, this endpoint is enabled. To disable it, set `exchange_enabled` to `false` in the `cookie` section of your configuration file:
-
-  ```yaml
-  cookie:
-    name: session
-    secure: true
-    httponly: true
-    samesite: Lax
-    domain: .example.com
-    exchange_enabled: false  # Set to true (default) to enable
-  ```
-
-  When disabled, requests to the endpoint will receive a 404 response.
+- **GET `/verify`** - Validates session cookie/header via Traefik forward-auth checks; redirects to login if needed
+- **GET `/`** - Redirects to the login page with a safe `rd` return destination
+- **GET `/login`** - Renders the login form with CSRF protection
+- **POST `/login`** - Validates credentials, sets the signed session cookie, and redirects to `rd`
+- **GET `/done`** - Optional local success landing page after authentication
+- **GET `/cookie-crumbling-protocol-v2`** - Returns authenticated token and identity for cookie/header exchange
+- **GET/POST `/logout`** - Clears the session cookie and renders logged-out feedback
+- **GET `/healthz`** - Returns service health status for probes and monitoring
 
 ## Automated Dependency Management
 

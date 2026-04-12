@@ -5,6 +5,7 @@ MrSecure
 allstar
 auth
 dependabot
+healthz
 home.arpa
 homelab
 homelab-auth
