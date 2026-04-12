@@ -8,6 +8,7 @@
 
 set -euo pipefail
 
+ARGUMENTS=${1:-NONE}
 CONFIG_FILE="${CONFIG_FILE:-/app/config.yaml}"
 SERVICE_PORT="${SERVICE_PORT:-55000}"
 PYTHON="${PYTHON:-python3}"
@@ -29,7 +30,15 @@ else
     echo "  Hashing key: will use SHA1 hash of config file as fallback"
 fi
 
+if [[ "--check-config" == "${ARGUMENTS}" ]]; then
+    echo "Performing configuration check..."
+    # Run the application with a special argument to validate the config and exit
+    _confg_args="--check-config --print-config"
+else
+    _confg_args=""
+fi
 # Start gunicorn with proper timeout and error handling configuration
+# shellcheck disable=SC2086
 exec gunicorn \
     --workers 4 \
     --worker-class sync \
@@ -38,7 +47,8 @@ exec gunicorn \
     --keep-alive 5 \
     --max-requests 1000 \
     --max-requests-jitter 100 \
+    --control-socket /app/.gunicorn/gunicorn.sock \
     --graceful-timeout 10 \
     --error-logfile - \
     --access-logfile - \
-    wsgi:app
+    $_confg_args wsgi:app

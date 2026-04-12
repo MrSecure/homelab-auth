@@ -112,36 +112,35 @@ def test_docker_image():
         version = pyproject_data.get("project", {}).get("version", "0.0.0")
 
     try:
-        # Test that --help works with version tag
+        # The image ENTRYPOINT already execs gunicorn, so pass gunicorn flags only.
+        # Test that entrypoint supports config validation with version tag.
         subprocess.run(
             [
                 "docker",
                 "run",
                 "--rm",
                 f"{image_name}:{version}",
-                "gunicorn",
                 "--check-config",
-                "main:app",
             ],
             capture_output=True,
             check=True,
             cwd=project_root,
+            timeout=30,  # Set a timeout to prevent hanging indefinitely
         )
 
-        # Test that --help works with latest tag
+        # Test that entrypoint supports config validation with latest tag.
         subprocess.run(
             [
                 "docker",
                 "run",
                 "--rm",
                 f"{image_name}:latest",
-                "gunicorn",
                 "--check-config",
-                "main:app",
             ],
             capture_output=True,
             check=True,
             cwd=project_root,
+            timeout=30,  # Set a timeout to prevent hanging indefinitely
         )
 
     except subprocess.CalledProcessError as error:

@@ -61,7 +61,9 @@ COPY --from=builder --chown=app:app /app /app
 
 # Create app user
 RUN chown root:app /app/config.yaml && \
-    chmod 0660 /app/config.yaml
+    chmod 0660 /app/config.yaml && \
+    mkdir /app/.gunicorn && \
+    chown app:app /app/.gunicorn
 
 # Metadata
 ARG NAME="homelab_auth"
