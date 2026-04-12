@@ -10,6 +10,9 @@ cookie:
   allowed_hosts:
   - dev.home.arpa
   - labs.home.arpa
+  exchange_enabled: true
+header:
+  name: X-HomeLab-Auth-Token
 server:
   port: 55000
   host: 0.0.0.0

@@ -537,20 +537,41 @@ def login():
 
 @app.route("/verify", methods=["GET"])
 def verify():
+    # Check cookie first - the vast majority of requests use cookies
     signed_cookie = request.cookies.get(cfg["cookie"]["name"])
-    if not signed_cookie:
-        return "Unauthorized", 401
+    if signed_cookie:
+        try:
+            signer.unsign(signed_cookie, max_age=cfg["auth"]["session_max_age"])
+            return "OK", 200
+        except (BadSignature, SignatureExpired):
+            return "Invalid Session", 401
 
-    try:
-        signer.unsign(signed_cookie, max_age=cfg["auth"]["session_max_age"])
-        return "OK", 200
-    except (BadSignature, SignatureExpired):
-        return "Invalid Session", 401
+    # When cookie exchange is enabled, also check header as fallback
+    if cfg.get("cookie", {}).get("exchange_enabled", True):
+        header_token = request.headers.get(
+            cfg.get("header", {}).get("name", "X-HomeLab-Auth-Token")
+        )
+        if header_token:
+            try:
+                signer.unsign(header_token, max_age=cfg["auth"]["session_max_age"])
+                return "OK", 200
+            except (BadSignature, SignatureExpired):
+                return "Invalid Session", 401
+
+    return "Unauthorized", 401
 
 
 @app.route("/cookie-crumbling-protocol-v2", methods=["GET"])
 def cookie_crumbling_protocol_v2():
     """Return authenticated cookie token and user identity."""
+    # Check if endpoint is enabled in configuration
+    if not cfg.get("cookie", {}).get("exchange_enabled", True):
+        logger.warning(
+            "cookie_exchange endpoint accessed but is disabled in configuration from %s",
+            request.remote_addr,
+        )
+        return {"error": "Not Found"}, 404
+
     signed_cookie = request.cookies.get(cfg["cookie"]["name"])
     if not signed_cookie:
         return {"error": "Unauthorized"}, 401
