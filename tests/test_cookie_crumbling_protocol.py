@@ -274,20 +274,20 @@ def test_verify_endpoint_checks_header():
     # Verify it checks exchange_enabled
     assert "exchange_enabled" in func_content
     # Verify it uses the header
-    assert "X-HomeLab-Auth-Token" in func_content
+    assert "X-HomeLab-Misconfigured" in func_content
 
 
 @pytest.mark.unit
 def test_header_name_default_value():
-    """Verify header name defaults to X-HomeLab-Auth-Token when not specified."""
+    """Verify header name defaults to X-HomeLab-Misconfigured when not specified."""
     cfg = {}
-    header_name = cfg.get("header", {}).get("name", "X-HomeLab-Auth-Token")
-    assert header_name == "X-HomeLab-Auth-Token"
+    header_name = cfg.get("header", {}).get("name", "X-HomeLab-Misconfigured")
+    assert header_name == "X-HomeLab-Misconfigured"
 
 
 @pytest.mark.unit
 def test_header_name_can_be_customized():
     """Verify header name can be customized via configuration."""
     cfg = {"header": {"name": "X-Custom-Token"}}
-    header_name = cfg.get("header", {}).get("name", "X-HomeLab-Auth-Token")
+    header_name = cfg.get("header", {}).get("name", "X-HomeLab-Misconfigured")
     assert header_name == "X-Custom-Token"

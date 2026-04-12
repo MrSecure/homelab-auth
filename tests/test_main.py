@@ -3,8 +3,11 @@
 Test main.py Flask application
 """
 
+import importlib.util
+import sys
 import tempfile
 from pathlib import Path
+from types import ModuleType
 from unittest.mock import patch
 
 import pytest
@@ -17,6 +20,57 @@ def mock_main_initialization():
     with patch("sys.exit") as mock_exit:
         # Return a default config dict when load_config is called at module level
         yield
+
+
+def load_main_module(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> ModuleType:
+    """Load src/main.py against a temporary config directory for route tests."""
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text(
+        """
+auth:
+    hashing_string: test-key
+    session_max_age: 43200
+    htpasswd_path: users.htpasswd
+cookie:
+    name: session
+    domain: .example.com
+    secure: true
+    httponly: true
+    samesite: Lax
+    exchange_enabled: true
+header:
+    name: X-HomeLab-Auth-Token
+server:
+    port: 5000
+redir:
+    external_name: auth
+    default_destination: dashboard
+page:
+    title: Login
+""".strip()
+    )
+    (tmp_path / "users.htpasswd").write_text(
+        "testuser:$2y$12$R9h/cIPz0gi.URNNX3HNJe9Z1q43NbEsGe7nCLwjYaXpYhEjrRxzq\n"
+    )
+
+    repo_root = Path(__file__).parent.parent
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.syspath_prepend(str(repo_root / "src"))
+    monkeypatch.setattr(sys, "argv", ["main.py", str(config_file)])
+
+    module_name = f"main_for_test_{tmp_path.name}"
+    spec = importlib.util.spec_from_file_location(
+        module_name, repo_root / "src" / "main.py"
+    )
+    assert spec is not None
+    assert spec.loader is not None
+
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.app.config["TESTING"] = True
+    return module
 
 
 @pytest.mark.unit
@@ -352,3 +406,64 @@ def test_csrf_invalid_token_format():
     invalid_token = "not.a.valid.token.format"
     with pytest.raises(BadSignature):
         serializer.loads(invalid_token, max_age=3600)
+
+
+@pytest.mark.unit
+def test_login_redirects_when_valid_header_token_present(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Test /login redirects when a valid configured header token is present."""
+    main_module = load_main_module(tmp_path, monkeypatch)
+    client = main_module.app.test_client()
+    header_token = main_module.signer.sign("header-user").decode("utf-8")
+
+    response = client.get(
+        "/login?rd=/done",
+        headers={"X-HomeLab-Auth-Token": header_token},
+        environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/done"
+
+
+@pytest.mark.unit
+def test_login_prefers_cookie_before_header(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Test /login honors a valid cookie before considering the header fallback."""
+    main_module = load_main_module(tmp_path, monkeypatch)
+    client = main_module.app.test_client()
+    valid_cookie = main_module.signer.sign("cookie-user").decode("utf-8")
+    client.set_cookie(main_module.cfg["cookie"]["name"], valid_cookie)
+
+    response = client.get(
+        "/login?rd=/done",
+        headers={
+            "X-HomeLab-Auth-Token": "invalid-token",
+        },
+        environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/done"
+
+
+@pytest.mark.unit
+def test_login_ignores_header_when_exchange_disabled(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Test /login does not trust the header fallback when exchange is disabled."""
+    main_module = load_main_module(tmp_path, monkeypatch)
+    main_module.cfg["cookie"]["exchange_enabled"] = False
+    client = main_module.app.test_client()
+    header_token = main_module.signer.sign("header-user").decode("utf-8")
+
+    response = client.get(
+        "/login?rd=/done",
+        headers={"X-HomeLab-Auth-Token": header_token},
+        environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
+    )
+
+    assert response.status_code == 200
+    assert b"<form method=\"post\">" in response.data

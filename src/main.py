@@ -465,17 +465,29 @@ def login():
         except (BadSignature, SignatureExpired):
             pass  # Continue to login form
 
+    if cfg.get("cookie", {}).get("exchange_enabled", True):
+        header_token = request.headers.get(
+            cfg.get("header", {}).get("name", "X-HomeLab-Misconfigured")
+        )
+        if header_token:
+            try:
+                signer.unsign(header_token, max_age=cfg["auth"]["session_max_age"])
+                return redirect(target_url)
+            except (BadSignature, SignatureExpired):
+                pass  # Continue to login form
+
+    # Normalize optional remote address to a non-None string
+    client_ip: str = request.remote_addr or "unknown"
+
     if request.method == "POST":
         # Validate CSRF token on POST request
         csrf_token = request.form.get("csrf_token", "").strip()
-        if not validate_csrf_token(csrf_token, request.remote_addr):
-            logger.warning(
-                "Login attempt with invalid CSRF token from %s", request.remote_addr
-            )
+        if not validate_csrf_token(csrf_token, client_ip):
+            logger.warning("Login attempt with invalid CSRF token from %s", client_ip)
             return render_login_template(
                 cfg["page"]["title"],
                 feedback="Invalid form submission. Please try again.",
-                csrf_token=generate_csrf_token(request.remote_addr),
+                csrf_token=generate_csrf_token(client_ip),
             ), 400
 
         username = request.form.get("user", "").strip()
@@ -483,30 +495,24 @@ def login():
 
         # Validate inputs are present and within reasonable limits
         if not username or not password:
-            logger.warning(
-                "Login attempt with missing credentials from %s", request.remote_addr
-            )
+            logger.warning("Login attempt with missing credentials from %s", client_ip)
             return render_login_template(
                 cfg["page"]["title"],
                 feedback="Invalid Credentials.",
-                csrf_token=generate_csrf_token(request.remote_addr),
+                csrf_token=generate_csrf_token(client_ip),
             ), 401
 
         # Prevent oversized input attacks
         if len(username) > 255 or len(password) > 4096:
-            logger.warning(
-                "Login attempt with oversized input from %s", request.remote_addr
-            )
+            logger.warning("Login attempt with oversized input from %s", client_ip)
             return render_login_template(
                 cfg["page"]["title"],
                 feedback="Invalid Credentials.",
-                csrf_token=generate_csrf_token(request.remote_addr),
+                csrf_token=generate_csrf_token(client_ip),
             ), 401
 
         if users.check_password(username, password):
-            logger.info(
-                "Successful login for user: %s from %s", username, request.remote_addr
-            )
+            logger.info("Successful login for user: %s from %s", username, client_ip)
             signed_val = signer.sign(username).decode("utf-8")
 
             resp = make_response(redirect(target_url))
@@ -521,17 +527,15 @@ def login():
             )
             return resp
 
-        logger.warning(
-            "Failed login attempt for user: %s from %s", username, request.remote_addr
-        )
+        logger.warning("Failed login attempt for user: %s from %s", username, client_ip)
         return render_login_template(
             cfg["page"]["title"],
             feedback="Invalid Credentials.",
-            csrf_token=generate_csrf_token(request.remote_addr),
+            csrf_token=generate_csrf_token(client_ip),
         ), 401
 
     # Generate CSRF token for GET request
-    csrf_token = generate_csrf_token(request.remote_addr)
+    csrf_token = generate_csrf_token(client_ip)
     return render_login_template(cfg["page"]["title"], csrf_token=csrf_token)
 
 
@@ -549,7 +553,7 @@ def verify():
     # When cookie exchange is enabled, also check header as fallback
     if cfg.get("cookie", {}).get("exchange_enabled", True):
         header_token = request.headers.get(
-            cfg.get("header", {}).get("name", "X-HomeLab-Auth-Token")
+            cfg.get("header", {}).get("name", "X-HomeLab-Misconfigured")
         )
         if header_token:
             try:
@@ -574,15 +578,35 @@ def cookie_crumbling_protocol_v2():
 
     signed_cookie = request.cookies.get(cfg["cookie"]["name"])
     if not signed_cookie:
-        return {"error": "Unauthorized"}, 401
+        logger.debug(
+            "cookie_exchange endpoint accessed without session cookie from %s",
+            request.remote_addr,
+        )
+        # Return 400 instead of 401 to prevent traefik-level auth loops
+        return {"error": "Unauthorized"}, 400
 
     try:
         identity = signer.unsign(
             signed_cookie, max_age=cfg["auth"]["session_max_age"]
         ).decode("utf-8")
-        return {"token": signed_cookie, "identity": identity}, 200
+        logger.debug(
+            "cookie_exchange successful for user '%s' from %s",
+            identity,
+            request.remote_addr,
+        )
+        return {
+            "token": signed_cookie,
+            "identity": identity,
+            "cookie": cfg["cookie"]["name"],
+            "header": cfg.get("header", {}).get("name", "X-HomeLab-Misconfigured"),
+        }, 200
     except (BadSignature, SignatureExpired):
-        return {"error": "Invalid Session"}, 401
+        logger.debug(
+            "cookie_exchange endpoint accessed with invalid session cookie from %s",
+            request.remote_addr,
+        )
+        # Return 400 instead of 401 to prevent traefik-level auth loops
+        return {"error": "Invalid Session"}, 400
 
 
 @app.route("/logout", methods=["GET", "POST"])
