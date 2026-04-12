@@ -145,8 +145,8 @@ def test_get_cookie_subdomain_logic():
 
 
 @pytest.mark.unit
-def test_is_safe_redirect_relative_path():
-    """Test is_safe_redirect accepts relative URLs."""
+def test_get_safe_redirect_url_relative_path():
+    """Test get_safe_redirect_url accepts relative URLs."""
     target = "/done"
     # Relative URLs should be safe
     assert target.startswith("/")
@@ -156,8 +156,8 @@ def test_is_safe_redirect_relative_path():
 
 
 @pytest.mark.unit
-def test_is_safe_redirect_rejects_protocol_relative_urls():
-    """Test is_safe_redirect rejects protocol-relative URLs like //evil.com."""
+def test_get_safe_redirect_url_rejects_protocol_relative_urls():
+    """Test get_safe_redirect_url rejects protocol-relative URLs like //evil.com."""
     # Protocol-relative URLs start with // and resolve to external hosts
     target = "//evil.com/steal"
     is_safe = target.startswith("/") and not target.startswith("//")
@@ -169,8 +169,8 @@ def test_is_safe_redirect_rejects_protocol_relative_urls():
 
 
 @pytest.mark.unit
-def test_is_safe_redirect_absolute_domain_matching():
-    """Test is_safe_redirect domain matching logic."""
+def test_get_safe_redirect_url_absolute_domain_matching():
+    """Test get_safe_redirect_url domain matching logic."""
     from urllib.parse import urlparse
 
     # Test safe absolute URL

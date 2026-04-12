@@ -254,33 +254,55 @@ def get_cookie_subdomain():
     return f".{domain}"
 
 
-def is_safe_redirect(target_url):
+def get_safe_redirect_url(user_url: str, default_url: str) -> str:
+    """Validate a redirect URL and return a safe redirect target.
+
+    Prevents open-redirect attacks by ensuring the redirect stays within the
+    configured domain. Protocol-relative URLs (e.g. ``//evil.com``) are
+    rejected because browsers treat them as absolute URLs.
+
+    Args:
+        user_url: The URL requested by the user (e.g. from the ``rd`` param).
+        default_url: A safe fallback URL sourced entirely from server config.
+
+    Returns:
+        ``user_url`` unchanged when it is safe, otherwise ``default_url``.
     """
-    Validate that the redirect URL's domain is within the cookie domain.
-    Returns True if safe, False otherwise.
-    """
-    if target_url.startswith("/") and not target_url.startswith("//"):
-        return True  # Relative URLs are safe (protocol-relative URLs like //evil.com are not)
+    if not user_url:
+        return default_url
+
+    # Protocol-relative URLs (//evil.com) start with "/" but redirect externally
+    if user_url.startswith("//"):
+        return default_url
+
+    # Plain relative paths (e.g. "/dashboard") cannot redirect to external hosts
+    if user_url.startswith("/"):
+        return user_url
 
     try:
-        parsed = urlparse(target_url)
+        parsed = urlparse(user_url)
+
+        # Only allow http/https schemes
+        if parsed.scheme not in ("http", "https"):
+            return default_url
+
         target_host = parsed.netloc.lower()
         cookie_domain = get_cookie_subdomain()
 
         if not cookie_domain:
-            return False
+            return default_url
 
         # Remove leading dot from cookie domain for comparison
         cookie_domain_clean = cookie_domain.lstrip(".")
 
-        # Check if target host is the cookie domain or a subdomain of it
+        # Accept the URL only if the host is the cookie domain or a subdomain
         if target_host == cookie_domain_clean or target_host.endswith(cookie_domain):
-            return True
+            return user_url
 
-        return False
+        return default_url
     except Exception:
-        logger.warning("Detected unsafe redirect URL: %s", target_url)
-        return False
+        logger.warning("Detected unsafe redirect URL: %s", user_url)
+        return default_url
 
 
 def generate_csrf_token(remote_addr: str) -> str:
@@ -430,13 +452,8 @@ LOGIN_FORM = """
 @app.route("/", methods=["GET"])
 def redir():
     domain = get_cookie_subdomain()
-    target_url = request.args.get(
-        "rd", f"https://{cfg['redir']['default_destination']}{domain}"
-    )
-
-    # Validate redirect URL is within allowed domain
-    if not is_safe_redirect(target_url):
-        target_url = f"https://{cfg['redir']['default_destination']}{domain}"
+    default_url = f"https://{cfg['redir']['default_destination']}{domain}"
+    target_url = get_safe_redirect_url(request.args.get("rd", ""), default_url)
 
     login_url = f"https://{cfg['redir']['external_name']}{domain}"
     return redirect(f"{login_url}/login?rd={target_url}", code=307)
@@ -445,13 +462,8 @@ def redir():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     domain = get_cookie_subdomain()
-    target_url = request.args.get(
-        "rd", f"https://{cfg['redir']['default_destination']}{domain}"
-    )
-
-    # Validate redirect URL is within allowed domain
-    if not is_safe_redirect(target_url):
-        target_url = f"https://{cfg['redir']['default_destination']}{domain}"
+    default_url = f"https://{cfg['redir']['default_destination']}{domain}"
+    target_url = get_safe_redirect_url(request.args.get("rd", ""), default_url)
 
     # --- Check for already logged-in user (valid session cookie) ---
     signed_cookie = request.cookies.get(cfg["cookie"]["name"])
