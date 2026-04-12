@@ -5,6 +5,10 @@ inputs:
   token:
     description: 'A Github token'
     required: true
+  node-version:
+    description: 'Node.js version to use'
+    required: false
+    default: '24.14.1'
   python-version:
     description: 'Python version to use'
     required: false
@@ -29,6 +33,12 @@ runs:
         enable-cache: true
         cache-dependency-glob: "**/uv.lock"
         python-version: ${{ inputs.python-version }}
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        check-latest: true
 
     - name: Install Task
       uses: go-task/setup-task@v1
