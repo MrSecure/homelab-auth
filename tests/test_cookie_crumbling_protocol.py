@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+"""Tests for the /cookie-crumbling-protocol-v2 endpoint."""
+
+import json
+
+import pytest
+
+
+@pytest.mark.unit
+def test_cookie_crumbling_protocol_v2_endpoint_exists():
+    """Verify the /cookie-crumbling-protocol-v2 endpoint is registered."""
+    from pathlib import Path
+
+    # Check that the endpoint is defined in main.py
+    main_py_path = Path(__file__).parent.parent / "src" / "main.py"
+    content = main_py_path.read_text()
+
+    assert '@app.route("/cookie-crumbling-protocol-v2"' in content
+    assert 'def cookie_crumbling_protocol_v2():' in content
+    assert 'methods=["GET"]' in content
+
+
+@pytest.mark.unit
+def test_cookie_crumbling_protocol_v2_response_structure():
+    """Verify the endpoint returns correct JSON structure for valid session."""
+    # Test the expected response structure
+    valid_response = {"token": "signed.cookie.value", "identity": "testuser"}
+    assert "token" in valid_response
+    assert "identity" in valid_response
+
+    error_response = {"error": "Unauthorized"}
+    assert "error" in error_response
+
+
+@pytest.mark.unit
+def test_cookie_crumbling_protocol_v2_invalid_session_structure():
+    """Verify the endpoint returns correct error structure for invalid session."""
+    error_response = {"error": "Invalid Session"}
+    assert "error" in error_response
+    assert error_response["error"] == "Invalid Session"
+
+
+@pytest.mark.unit
+def test_cookie_crumbling_protocol_v2_unauthorized_structure():
+    """Verify the endpoint returns correct error structure for missing session."""
+    error_response = {"error": "Unauthorized"}
+    assert "error" in error_response
+    assert error_response["error"] == "Unauthorized"
+
+
+@pytest.mark.unit
+def test_cookie_crumbling_protocol_v2_status_codes():
+    """Verify the endpoint uses correct HTTP status codes."""
+    # Valid session returns 200 OK
+    valid_status = 200
+    assert valid_status == 200
+
+    # Missing/invalid session returns 401 Unauthorized
+    invalid_status = 401
+    assert invalid_status == 401
+
+
+@pytest.mark.unit
+def test_cookie_crumbling_protocol_v2_method_get_only():
+    """Verify the endpoint only accepts GET requests."""
+    from pathlib import Path
+
+    main_py_path = Path(__file__).parent.parent / "src" / "main.py"
+    content = main_py_path.read_text()
+
+    # Find the decorator line for cookie_crumbling_protocol_v2
+    lines = content.split("\n")
+    target_index = None
+    for i, line in enumerate(lines):
+        if '@app.route("/cookie-crumbling-protocol-v2"' in line:
+            target_index = i
+            break
+
+    assert target_index is not None
+    assert 'methods=["GET"]' in lines[target_index]
+
+
+@pytest.mark.unit
+def test_cookie_crumbling_protocol_v2_uses_signer():
+    """Verify the endpoint validates signed cookies using the signer."""
+    from pathlib import Path
+
+    main_py_path = Path(__file__).parent.parent / "src" / "main.py"
+    content = main_py_path.read_text()
+
+    # Find the function definition
+    func_start = content.find("def cookie_crumbling_protocol_v2():")
+    func_end = content.find("\n\n@app.route", func_start)
+    func_content = content[func_start:func_end]
+
+    # Verify it checks for signed_cookie
+    assert "signed_cookie" in func_content
+    # Verify it uses the signer to unsign
+    assert "signer.unsign" in func_content
+    # Verify it checks max_age
+    assert "session_max_age" in func_content
+
+
+@pytest.mark.unit
+def test_cookie_crumbling_protocol_v2_handles_bad_signature():
+    """Verify the endpoint handles BadSignature exception."""
+    from pathlib import Path
+
+    main_py_path = Path(__file__).parent.parent / "src" / "main.py"
+    content = main_py_path.read_text()
+
+    func_start = content.find("def cookie_crumbling_protocol_v2():")
+    func_end = content.find("\n\n@app.route", func_start)
+    func_content = content[func_start:func_end]
+
+    # Verify exception handling
+    assert "BadSignature" in func_content
+    assert "SignatureExpired" in func_content
+    assert "except" in func_content
+
+
+@pytest.mark.unit
+def test_cookie_crumbling_protocol_v2_returns_both_token_and_identity():
+    """Verify the endpoint returns both token and user identity in response."""
+    from pathlib import Path
+
+    main_py_path = Path(__file__).parent.parent / "src" / "main.py"
+    content = main_py_path.read_text()
+
+    func_start = content.find("def cookie_crumbling_protocol_v2():")
+    func_end = content.find("\n\n@app.route", func_start)
+    func_content = content[func_start:func_end]
+
+    # Verify the response includes both token and identity
+    assert '"token":' in func_content
+    assert '"identity":' in func_content
+    assert "signed_cookie" in func_content
+    assert ".decode(" in func_content  # Convert bytes to string

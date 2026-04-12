@@ -548,6 +548,22 @@ def verify():
         return "Invalid Session", 401
 
 
+@app.route("/cookie-crumbling-protocol-v2", methods=["GET"])
+def cookie_crumbling_protocol_v2():
+    """Return authenticated cookie token and user identity."""
+    signed_cookie = request.cookies.get(cfg["cookie"]["name"])
+    if not signed_cookie:
+        return {"error": "Unauthorized"}, 401
+
+    try:
+        identity = signer.unsign(
+            signed_cookie, max_age=cfg["auth"]["session_max_age"]
+        ).decode("utf-8")
+        return {"token": signed_cookie, "identity": identity}, 200
+    except (BadSignature, SignatureExpired):
+        return {"error": "Invalid Session"}, 401
+
+
 @app.route("/logout", methods=["GET", "POST"])
 def logout():
     """Logout endpoint that invalidates the session cookie."""
