@@ -145,7 +145,7 @@ task -v build
 
 ## API Endpoints
 
-- **GET `/verify`** - Validates session cookie/header via Traefik forward-auth checks; redirects to login if needed
+- **GET `/verify`** - Validates session cookie/header for Traefik forward-auth checks and returns status responses (`OK`, `Invalid Session`, or `Unauthorized`) without redirecting
 - **GET `/`** - Redirects to the login page with a safe `rd` return destination
 - **GET `/login`** - Renders the login form with CSRF protection
 - **POST `/login`** - Validates credentials, sets the signed session cookie, and redirects to `rd`
