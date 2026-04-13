@@ -9,6 +9,7 @@ import tempfile
 from pathlib import Path
 from types import ModuleType
 from unittest.mock import patch
+from urllib.parse import quote, urlparse, parse_qs
 
 import pytest
 
@@ -497,7 +498,6 @@ def test_root_redir_encodes_rd_in_login_redirect(
 
     # rd contains characters that must be percent-encoded when placed in a query param
     rd_value = "/path?key=val&other=1"
-    from urllib.parse import quote, urlparse, parse_qs
 
     response = client.get(
         f"/?rd={quote(rd_value, safe='')}",
