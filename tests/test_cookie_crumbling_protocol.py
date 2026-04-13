@@ -1,176 +1,186 @@
 #!/usr/bin/env python3
-"""Tests for the /cookie-crumbling-protocol-v2 endpoint."""
+"""Functional tests for the /cookie-crumbling-protocol-v2 endpoint."""
 
-import json
+import importlib.util
+import sys
+from pathlib import Path
+from types import ModuleType
+from unittest.mock import patch
 
 import pytest
 
 
-@pytest.mark.unit
-def test_cookie_crumbling_protocol_v2_endpoint_exists():
-    """Verify the /cookie-crumbling-protocol-v2 endpoint is registered."""
-    from pathlib import Path
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
-    # Check that the endpoint is defined in main.py
-    main_py_path = Path(__file__).parent.parent / "src" / "main.py"
-    content = main_py_path.read_text()
-
-    assert '@app.route("/cookie-crumbling-protocol-v2"' in content
-    assert 'def cookie_crumbling_protocol_v2():' in content
-    assert 'methods=["GET"]' in content
-
-
-@pytest.mark.unit
-def test_cookie_crumbling_protocol_v2_response_structure():
-    """Verify the endpoint returns correct JSON structure for valid session."""
-    # Test the expected response structure
-    valid_response = {"token": "signed.cookie.value", "identity": "testuser"}
-    assert "token" in valid_response
-    assert "identity" in valid_response
-
-    error_response = {"error": "Unauthorized"}
-    assert "error" in error_response
-
-
-@pytest.mark.unit
-def test_cookie_crumbling_protocol_v2_invalid_session_structure():
-    """Verify the endpoint returns correct error structure for invalid session."""
-    error_response = {"error": "Invalid Session"}
-    assert "error" in error_response
-    assert error_response["error"] == "Invalid Session"
+_MINIMAL_CONFIG = """
+auth:
+    hashing_string: test-key
+    session_max_age: 43200
+    htpasswd_path: users.htpasswd
+cookie:
+    name: session
+    domain: .example.com
+    secure: true
+    httponly: true
+    samesite: Lax
+    exchange_enabled: true
+header:
+    name: X-HomeLab-Auth-Token
+server:
+    port: 5000
+redir:
+    external_name: auth
+    default_destination: dashboard
+page:
+    title: Login
+""".strip()
 
 
-@pytest.mark.unit
-def test_cookie_crumbling_protocol_v2_unauthorized_structure():
-    """Verify the endpoint returns correct error structure for missing session."""
-    error_response = {"error": "Unauthorized"}
-    assert "error" in error_response
-    assert error_response["error"] == "Unauthorized"
+@pytest.fixture(autouse=True)
+def _mock_sys_exit():
+    """Prevent main.py module-level sys.exit() calls from aborting tests."""
+    with patch("sys.exit"):
+        yield
 
 
-@pytest.mark.unit
-def test_cookie_crumbling_protocol_v2_status_codes():
-    """Verify the endpoint uses correct HTTP status codes."""
-    # Valid session returns 200 OK
-    valid_status = 200
-    assert valid_status == 200
+def _load_main_module(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, config_yaml: str = _MINIMAL_CONFIG) -> ModuleType:
+    """Load src/main.py against a temporary config directory for route tests."""
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text(config_yaml)
+    (tmp_path / "users.htpasswd").write_text(
+        "testuser:$2y$12$R9h/cIPz0gi.URNNX3HNJe9Z1q43NbEsGe7nCLwjYaXpYhEjrRxzq\n"
+    )
 
-    # Missing/invalid session returns 400 Bad Request
-    invalid_status = 400
-    assert invalid_status == 400
+    repo_root = Path(__file__).parent.parent
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.syspath_prepend(str(repo_root / "src"))
+    monkeypatch.setattr(sys, "argv", ["main.py", str(config_file)])
+
+    module_name = f"main_for_ccpv2_{tmp_path.name}"
+    spec = importlib.util.spec_from_file_location(module_name, repo_root / "src" / "main.py")
+    assert spec is not None and spec.loader is not None
+
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.app.config["TESTING"] = True
+    return module
 
 
-@pytest.mark.unit
-def test_cookie_crumbling_protocol_v2_method_get_only():
-    """Verify the endpoint only accepts GET requests."""
-    from pathlib import Path
-
-    main_py_path = Path(__file__).parent.parent / "src" / "main.py"
-    content = main_py_path.read_text()
-
-    # Find the decorator line for cookie_crumbling_protocol_v2
-    lines = content.split("\n")
-    target_index = None
-    for i, line in enumerate(lines):
-        if '@app.route("/cookie-crumbling-protocol-v2"' in line:
-            target_index = i
-            break
-
-    assert target_index is not None
-    assert 'methods=["GET"]' in lines[target_index]
+# ---------------------------------------------------------------------------
+# Functional endpoint tests
+# ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
-def test_cookie_crumbling_protocol_v2_uses_signer():
-    """Verify the endpoint validates signed cookies using the signer."""
-    from pathlib import Path
+def test_cookie_crumbling_protocol_v2_valid_cookie_returns_200(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Enabled endpoint + valid session cookie returns 200 with token and identity."""
+    mod = _load_main_module(tmp_path, monkeypatch)
+    client = mod.app.test_client()
 
-    main_py_path = Path(__file__).parent.parent / "src" / "main.py"
-    content = main_py_path.read_text()
+    valid_cookie = mod.signer.sign("testuser").decode("utf-8")
+    client.set_cookie(mod.cfg["cookie"]["name"], valid_cookie)
 
-    # Find the function definition
-    func_start = content.find("def cookie_crumbling_protocol_v2():")
-    func_end = content.find("\n\n@app.route", func_start)
-    func_content = content[func_start:func_end]
+    response = client.get("/cookie-crumbling-protocol-v2")
 
-    # Verify it checks for signed_cookie
-    assert "signed_cookie" in func_content
-    # Verify it uses the signer to unsign
-    assert "signer.unsign" in func_content
-    # Verify it checks max_age
-    assert "session_max_age" in func_content
-
-
-@pytest.mark.unit
-def test_cookie_crumbling_protocol_v2_handles_bad_signature():
-    """Verify the endpoint handles BadSignature exception."""
-    from pathlib import Path
-
-    main_py_path = Path(__file__).parent.parent / "src" / "main.py"
-    content = main_py_path.read_text()
-
-    func_start = content.find("def cookie_crumbling_protocol_v2():")
-    func_end = content.find("\n\n@app.route", func_start)
-    func_content = content[func_start:func_end]
-
-    # Verify exception handling
-    assert "BadSignature" in func_content
-    assert "SignatureExpired" in func_content
-    assert "except" in func_content
+    assert response.status_code == 200
+    assert response.content_type == "application/json"
+    body = response.get_json()
+    assert body["token"] == valid_cookie
+    assert body["identity"] == "testuser"
+    assert "cookie" in body
+    assert "header" in body
 
 
 @pytest.mark.unit
-def test_cookie_crumbling_protocol_v2_returns_both_token_and_identity():
-    """Verify the endpoint returns both token and user identity in response."""
-    from pathlib import Path
+def test_cookie_crumbling_protocol_v2_missing_cookie_returns_400(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Enabled endpoint + no session cookie returns 400 Unauthorized (not 401, to avoid auth loops)."""
+    mod = _load_main_module(tmp_path, monkeypatch)
+    client = mod.app.test_client()
 
-    main_py_path = Path(__file__).parent.parent / "src" / "main.py"
-    content = main_py_path.read_text()
+    response = client.get("/cookie-crumbling-protocol-v2")
 
-    func_start = content.find("def cookie_crumbling_protocol_v2():")
-    func_end = content.find("\n\n@app.route", func_start)
-    func_content = content[func_start:func_end]
-
-    # Verify the response includes both token and identity
-    assert '"token":' in func_content
-    assert '"identity":' in func_content
-    assert "signed_cookie" in func_content
-    assert ".decode(" in func_content  # Convert bytes to string
+    assert response.status_code == 400
+    assert response.content_type == "application/json"
+    assert response.get_json() == {"error": "Unauthorized"}
 
 
 @pytest.mark.unit
-def test_cookie_crumbling_protocol_v2_checks_config_enabled():
-    """Verify the endpoint checks if the configuration is enabled."""
-    from pathlib import Path
+def test_cookie_crumbling_protocol_v2_bad_signature_returns_400(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Enabled endpoint + tampered cookie returns 400 Invalid Session."""
+    mod = _load_main_module(tmp_path, monkeypatch)
+    client = mod.app.test_client()
 
-    main_py_path = Path(__file__).parent.parent / "src" / "main.py"
-    content = main_py_path.read_text()
+    client.set_cookie(mod.cfg["cookie"]["name"], "this.is.not.a.valid.signed.cookie")
 
-    func_start = content.find("def cookie_crumbling_protocol_v2():")
-    func_end = content.find("\n\n@app.route", func_start)
-    func_content = content[func_start:func_end]
+    response = client.get("/cookie-crumbling-protocol-v2")
 
-    # Verify it checks for cookie.exchange_enabled config
-    assert "cookie" in func_content
-    assert "exchange_enabled" in func_content
-    assert "cfg.get" in func_content
+    assert response.status_code == 400
+    assert response.content_type == "application/json"
+    assert response.get_json() == {"error": "Invalid Session"}
 
 
 @pytest.mark.unit
-def test_cookie_crumbling_protocol_v2_returns_404_when_disabled():
-    """Verify the endpoint returns 404 when cookie_exchange is disabled."""
-    from pathlib import Path
+def test_cookie_crumbling_protocol_v2_expired_cookie_returns_400(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Enabled endpoint + expired session cookie returns 400 Invalid Session."""
+    import time
 
-    main_py_path = Path(__file__).parent.parent / "src" / "main.py"
-    content = main_py_path.read_text()
+    mod = _load_main_module(tmp_path, monkeypatch)
+    client = mod.app.test_client()
 
-    func_start = content.find("def cookie_crumbling_protocol_v2():")
-    func_end = content.find("\n\n@app.route", func_start)
-    func_content = content[func_start:func_end]
+    # Sign the cookie as if it was issued 2 days ago so it is expired (session_max_age=43200 = 12 h)
+    past_time = time.time() - 172800
+    with patch("time.time", return_value=past_time):
+        expired_cookie = mod.signer.sign("testuser").decode("utf-8")
 
-    # Verify it returns 404 when disabled
-    assert "404" in func_content
-    assert '"Not Found"' in func_content
+    client.set_cookie(mod.cfg["cookie"]["name"], expired_cookie)
+
+    response = client.get("/cookie-crumbling-protocol-v2")
+
+    assert response.status_code == 400
+    assert response.content_type == "application/json"
+    assert response.get_json() == {"error": "Invalid Session"}
+
+
+@pytest.mark.unit
+def test_cookie_crumbling_protocol_v2_disabled_returns_404(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Disabled config returns 404 Not Found regardless of cookie presence."""
+    mod = _load_main_module(tmp_path, monkeypatch)
+    mod.cfg["cookie"]["exchange_enabled"] = False
+    client = mod.app.test_client()
+
+    valid_cookie = mod.signer.sign("testuser").decode("utf-8")
+    client.set_cookie(mod.cfg["cookie"]["name"], valid_cookie)
+
+    response = client.get("/cookie-crumbling-protocol-v2")
+
+    assert response.status_code == 404
+    assert response.content_type == "application/json"
+    assert response.get_json() == {"error": "Not Found"}
+
+
+@pytest.mark.unit
+def test_cookie_crumbling_protocol_v2_post_method_not_allowed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Endpoint only accepts GET; POST returns 405 Method Not Allowed."""
+    mod = _load_main_module(tmp_path, monkeypatch)
+    client = mod.app.test_client()
+
+    response = client.post("/cookie-crumbling-protocol-v2")
+
+    assert response.status_code == 405
 
 
 @pytest.mark.unit
