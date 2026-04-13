@@ -37,6 +37,8 @@ page:
     title: Login
 """.strip()
 
+_DISABLED_EXCHANGE_CONFIG = _MINIMAL_CONFIG.replace("exchange_enabled: true", "exchange_enabled: false")
+
 
 @pytest.fixture(autouse=True)
 def _mock_sys_exit():
@@ -45,7 +47,7 @@ def _mock_sys_exit():
         yield
 
 
-def _load_main_module(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, config_yaml: str = _MINIMAL_CONFIG) -> ModuleType:
+def load_main_module(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, config_yaml: str = _MINIMAL_CONFIG) -> ModuleType:
     """Load src/main.py against a temporary config directory for route tests."""
     config_file = tmp_path / "config.yaml"
     config_file.write_text(config_yaml)
@@ -58,7 +60,7 @@ def _load_main_module(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, config_ya
     monkeypatch.syspath_prepend(str(repo_root / "src"))
     monkeypatch.setattr(sys, "argv", ["main.py", str(config_file)])
 
-    module_name = f"main_for_ccpv2_{tmp_path.name}"
+    module_name = f"main_for_cookie_exchange_test_{tmp_path.name}"
     spec = importlib.util.spec_from_file_location(module_name, repo_root / "src" / "main.py")
     assert spec is not None and spec.loader is not None
 
@@ -78,7 +80,7 @@ def test_cookie_crumbling_protocol_v2_valid_cookie_returns_200(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     """Enabled endpoint + valid session cookie returns 200 with token and identity."""
-    mod = _load_main_module(tmp_path, monkeypatch)
+    mod = load_main_module(tmp_path, monkeypatch)
     client = mod.app.test_client()
 
     valid_cookie = mod.signer.sign("testuser").decode("utf-8")
@@ -100,7 +102,7 @@ def test_cookie_crumbling_protocol_v2_missing_cookie_returns_400(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     """Enabled endpoint + no session cookie returns 400 Unauthorized (not 401, to avoid auth loops)."""
-    mod = _load_main_module(tmp_path, monkeypatch)
+    mod = load_main_module(tmp_path, monkeypatch)
     client = mod.app.test_client()
 
     response = client.get("/cookie-crumbling-protocol-v2")
@@ -115,7 +117,7 @@ def test_cookie_crumbling_protocol_v2_bad_signature_returns_400(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     """Enabled endpoint + tampered cookie returns 400 Invalid Session."""
-    mod = _load_main_module(tmp_path, monkeypatch)
+    mod = load_main_module(tmp_path, monkeypatch)
     client = mod.app.test_client()
 
     client.set_cookie(mod.cfg["cookie"]["name"], "this.is.not.a.valid.signed.cookie")
@@ -134,11 +136,11 @@ def test_cookie_crumbling_protocol_v2_expired_cookie_returns_400(
     """Enabled endpoint + expired session cookie returns 400 Invalid Session."""
     import time
 
-    mod = _load_main_module(tmp_path, monkeypatch)
+    mod = load_main_module(tmp_path, monkeypatch)
     client = mod.app.test_client()
 
     # Sign the cookie as if it was issued 2 days ago so it is expired (session_max_age=43200 = 12 h)
-    past_time = time.time() - 172800
+    past_time = time.time() - (2 * 24 * 60 * 60)  # 2 days in seconds
     with patch("time.time", return_value=past_time):
         expired_cookie = mod.signer.sign("testuser").decode("utf-8")
 
@@ -156,8 +158,7 @@ def test_cookie_crumbling_protocol_v2_disabled_returns_404(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     """Disabled config returns 404 Not Found regardless of cookie presence."""
-    mod = _load_main_module(tmp_path, monkeypatch)
-    mod.cfg["cookie"]["exchange_enabled"] = False
+    mod = load_main_module(tmp_path, monkeypatch, _DISABLED_EXCHANGE_CONFIG)
     client = mod.app.test_client()
 
     valid_cookie = mod.signer.sign("testuser").decode("utf-8")
@@ -175,7 +176,7 @@ def test_cookie_crumbling_protocol_v2_post_method_not_allowed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     """Endpoint only accepts GET; POST returns 405 Method Not Allowed."""
-    mod = _load_main_module(tmp_path, monkeypatch)
+    mod = load_main_module(tmp_path, monkeypatch)
     client = mod.app.test_client()
 
     response = client.post("/cookie-crumbling-protocol-v2")
