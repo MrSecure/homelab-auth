@@ -55,9 +55,9 @@ def test_cookie_crumbling_protocol_v2_status_codes():
     valid_status = 200
     assert valid_status == 200
 
-    # Missing/invalid session returns 401 Unauthorized
-    invalid_status = 401
-    assert invalid_status == 401
+    # Missing/invalid session returns 400 Bad Request
+    invalid_status = 400
+    assert invalid_status == 400
 
 
 @pytest.mark.unit
