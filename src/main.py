@@ -278,22 +278,28 @@ def get_safe_redirect_url(user_url: str, default_url: str) -> str:
     if not user_url:
         return default_url
 
+    # Normalize backslashes: browsers may treat "\" as "/"
+    normalized_url = user_url.replace("\\", "/")
+
     # Protocol-relative URLs (//evil.com) start with "/" but redirect externally
-    if user_url.startswith("//"):
+    if normalized_url.startswith("//"):
         return default_url
 
     # Plain relative paths (e.g. "/dashboard") cannot redirect to external hosts
-    if user_url.startswith("/"):
-        return user_url
+    if normalized_url.startswith("/"):
+        return normalized_url
 
     try:
-        parsed = urlparse(user_url)
+        parsed = urlparse(normalized_url)
 
         # Only allow http/https schemes
         if parsed.scheme not in ("http", "https"):
             return default_url
 
-        target_host = parsed.netloc.lower()
+        target_host = (parsed.hostname or "").lower()
+        if not target_host:
+            return default_url
+
         cookie_domain = get_cookie_subdomain()
 
         if not cookie_domain:
@@ -304,7 +310,7 @@ def get_safe_redirect_url(user_url: str, default_url: str) -> str:
 
         # Accept the URL only if the host is the cookie domain or a subdomain
         if target_host == cookie_domain_clean or target_host.endswith(cookie_domain):
-            return user_url
+            return normalized_url
 
         return default_url
     except Exception:
