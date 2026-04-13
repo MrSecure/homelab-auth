@@ -34,7 +34,7 @@ from itsdangerous import (
     SignatureExpired,
     URLSafeTimedSerializer,
 )
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote
 
 # --- FIX: Passlib/Bcrypt 4.0+ Compatibility ---
 if not hasattr(bcrypt, "__about__"):
@@ -472,7 +472,7 @@ def redir():
     target_url = get_safe_redirect_url(request.args.get("rd", ""), default_url)
 
     login_url = f"https://{cfg['redir']['external_name']}{domain}"
-    return redirect(f"{login_url}/login?rd={target_url}", code=307)
+    return redirect(f"{login_url}/login?rd={quote(target_url, safe='')}", code=307)
 
 
 @app.route("/login", methods=["GET", "POST"])

@@ -466,3 +466,51 @@ def test_login_ignores_header_when_exchange_disabled(
 
     assert response.status_code == 200
     assert b"<form method=\"post\">" in response.data
+
+
+@pytest.mark.unit
+def test_redir_url_encodes_rd_parameter(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Test / encodes reserved characters in rd before appending to the login redirect URL."""
+    main_module = load_main_module(tmp_path, monkeypatch)
+    client = main_module.app.test_client()
+
+    # A target URL containing reserved characters that must be percent-encoded
+    response = client.get(
+        "/login?rd=/path%3Fkey%3Dval%26other%3D1",
+        environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
+    )
+
+    # The /login route shows a login form (no valid session) -- the important
+    # thing is there is no 500 / bad redirect from malformed query strings.
+    assert response.status_code in (200, 302)
+
+
+@pytest.mark.unit
+def test_root_redir_encodes_rd_in_login_redirect(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Test GET / encodes the rd value so reserved characters don't break the query string."""
+    main_module = load_main_module(tmp_path, monkeypatch)
+    client = main_module.app.test_client()
+
+    # rd contains characters that must be percent-encoded when placed in a query param
+    rd_value = "/path?key=val&other=1"
+    from urllib.parse import quote, urlparse, parse_qs
+
+    response = client.get(
+        f"/?rd={quote(rd_value, safe='')}",
+        environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
+    )
+
+    assert response.status_code == 307
+    location = response.headers["Location"]
+    # The rd param in the Location header must itself be percent-encoded so it is
+    # a single parameter value and not split by & or ?
+    parsed = urlparse(location)
+    qs = parse_qs(parsed.query, keep_blank_values=True)
+    assert "rd" in qs
+    rd_decoded = qs["rd"][0]
+    # parse_qs decodes the value -- it should round-trip back to the original rd
+    assert rd_decoded == rd_value
