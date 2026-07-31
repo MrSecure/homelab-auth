@@ -54,7 +54,7 @@ WORKDIR "/app"
 RUN apt-get update && apt-get install -y --no-install-recommends \
     busybox-static \
     && rm -rf /var/lib/apt/lists/*
-RUN groupadd -r app && useradd -r -g app app
+RUN groupadd -r app && useradd -m -r -g app app
 
 # Copy the virtual environment from builder
 COPY --from=builder --chown=app:app /app /app

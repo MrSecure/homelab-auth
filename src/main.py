@@ -195,6 +195,9 @@ cli_args = parse_cli_args()
 cfg_file = cli_args.config_file
 cfg = load_config(cfg_file)
 
+# Get response conde for failed authentication from config, default to 497 if not set
+failed_response_code = cfg.get("auth", {}).get("failed_response_code", 497)
+
 # Get hashing key from environment variable if available
 env_hashing_key = os.getenv("HOMELAB_AUTH_HASHING_KEY")
 
@@ -539,13 +542,13 @@ def login():
 def verify():
     signed_cookie = request.cookies.get(cfg["cookie"]["name"])
     if not signed_cookie:
-        return "Unauthorized", 401
+        return "Unauthorized", failed_response_code
 
     try:
         signer.unsign(signed_cookie, max_age=cfg["auth"]["session_max_age"])
         return "OK", 200
     except (BadSignature, SignatureExpired):
-        return "Invalid Session", 401
+        return "Invalid Session", failed_response_code
 
 
 @app.route("/logout", methods=["GET", "POST"])

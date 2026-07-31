@@ -18,6 +18,10 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
     exit 1
 fi
 
+if [[ "${1:-}" == "--check-config" ]]; then
+    exec gunicorn --check-config wsgi:app
+fi
+
 # Log the startup configuration
 echo "Starting homelab-auth"
 echo "  Config file: $CONFIG_FILE"
