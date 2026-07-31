@@ -195,8 +195,20 @@ cli_args = parse_cli_args()
 cfg_file = cli_args.config_file
 cfg = load_config(cfg_file)
 
-# Get response conde for failed authentication from config, default to 497 if not set
-failed_response_code = cfg.get("auth", {}).get("failed_response_code", 497)
+# Get response code for failed authentication from config, default to 497 if not set
+_raw_failed_response_code = cfg.get("auth", {}).get("failed_response_code", 497)
+try:
+    failed_response_code = int(_raw_failed_response_code)
+except (TypeError, ValueError):
+    logger.error(
+        "Configuration error: auth.failed_response_code must be an integer HTTP status code"
+    )
+    sys.exit(1)
+if not 400 <= failed_response_code <= 499:
+    logger.error(
+        "Configuration error: auth.failed_response_code must be between 400 and 499"
+    )
+    sys.exit(1)
 
 # Get hashing key from environment variable if available
 env_hashing_key = os.getenv("HOMELAB_AUTH_HASHING_KEY")
