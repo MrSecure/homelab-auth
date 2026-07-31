@@ -2,6 +2,7 @@ auth:
   hashing_string: 6NHHeMlkPptJqafxsVowwYlcKhI_cuCqftzkBaydJaY
   htpasswd_path: users.htpasswd
   session_max_age: 43200
+  failed_response_code: 497
 cookie:
   name: pecan_sandy
   secure: true

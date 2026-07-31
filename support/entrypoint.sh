@@ -17,6 +17,11 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
     echo "Error: Config file not found at $CONFIG_FILE" >&2
     exit 1
 fi
+export HOMELAB_AUTH_CONFIG_FILE="$CONFIG_FILE"
+
+if [[ "${1:-}" == "--check-config" ]]; then
+    exec gunicorn --check-config wsgi:app
+fi
 
 # Log the startup configuration
 echo "Starting homelab-auth"
