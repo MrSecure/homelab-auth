@@ -591,13 +591,19 @@ def verify():
 @app.route("/huzrabj6iiraigjxj5jveyr4f4rcstbtbrpa4kyh/whoami", methods=["GET"])
 def whoami():
     signed_cookie = request.cookies.get(cfg["cookie"]["name"])
+    if not signed_cookie:
+        logger.warning(
+            "Whoami request without session cookie from %s", request.remote_addr
+        )
+        return "Unauthorized", failed_response_code
+
     if not is_authenticated(signed_cookie):
+        logger.warning(
+            "Whoami request with invalid session cookie from %s", request.remote_addr
+        )
         return "Unauthorized", failed_response_code
 
     try:
-        if not signed_cookie:
-            return "Unauthorized", failed_response_code
-
         username = cookie_signer.unsign(
             signed_cookie, max_age=cfg["auth"]["session_max_age"]
         ).decode("utf-8")
@@ -612,6 +618,10 @@ def whoami():
         }
         return jsonify(response_data), 200
     except (BadSignature, SignatureExpired):
+        logger.warning(
+            "Whoami request with invalid or expired session cookie from %s",
+            request.remote_addr,
+        )
         return "Invalid session", 401
 
 
