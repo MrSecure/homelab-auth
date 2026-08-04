@@ -227,7 +227,7 @@ logger.debug(
 
 # Create signer immediately and clear the key material from module scope
 # to prevent accidental exposure in exception tracebacks or log statements
-signer = TimestampSigner(hashing_string)
+cookie_signer = TimestampSigner(hashing_string)
 csrf_serializer = URLSafeTimedSerializer(hashing_string)
 del hashing_string  # Explicitly remove the cryptographic material from module scope
 
@@ -298,7 +298,7 @@ def is_safe_redirect(target_url):
         return False
 
 
-def generate_csrf_token(remote_addr: str) -> str:
+def generate_csrf_token(remote_addr: str | None) -> str:
     """
     Generate a CSRF token for the current session.
 
@@ -312,6 +312,9 @@ def generate_csrf_token(remote_addr: str) -> str:
         Exception: If token generation fails
     """
     try:
+        if not remote_addr:
+            remote_addr = "FallBackToken-UnknownIP"
+            logger.warning("Remote address is None; using fallback CSRF token")
         token = csrf_serializer.dumps(remote_addr)
         logger.debug("Generated CSRF token for client: %s", remote_addr)
         return token
@@ -320,7 +323,9 @@ def generate_csrf_token(remote_addr: str) -> str:
         raise
 
 
-def validate_csrf_token(token: str, remote_addr: str, max_age: int = 3600) -> bool:
+def validate_csrf_token(
+    token: str | None, remote_addr: str | None, max_age: int = 3600
+) -> bool:
     """
     Validate a CSRF token.
 
@@ -412,6 +417,26 @@ def render_login_template(
     )
 
 
+def is_authenticated(signed_cookie) -> bool:
+    """
+    Check if the user is authenticated based on the session cookie.
+
+    Returns:
+        True if authenticated, False otherwise
+    """
+    if not signed_cookie:
+        logger.debug("No session cookie found; user is not authenticated")
+        return False
+
+    try:
+        cookie_signer.unsign(signed_cookie, max_age=cfg["auth"]["session_max_age"])
+        logger.debug("Valid session cookie found; user is authenticated")
+        return True
+    except (BadSignature, SignatureExpired):
+        logger.debug("Invalid or expired session cookie; user is not authenticated")
+        return False
+
+
 # HTML Template (Keep same as previous response)
 LOGIN_FORM = """
 <!DOCTYPE html>
@@ -470,15 +495,16 @@ def login():
 
     # --- Check for already logged-in user (valid session cookie) ---
     signed_cookie = request.cookies.get(cfg["cookie"]["name"])
-    if signed_cookie:
-        try:
-            username = signer.unsign(
-                signed_cookie, max_age=cfg["auth"]["session_max_age"]
-            )
-            # If valid session, redirect immediately
-            return redirect(target_url)
-        except (BadSignature, SignatureExpired):
-            pass  # Continue to login form
+    if is_authenticated(signed_cookie):
+        if signed_cookie:
+            try:
+                username = cookie_signer.unsign(
+                    signed_cookie, max_age=cfg["auth"]["session_max_age"]
+                )
+                # If valid session, redirect immediately
+                return redirect(target_url)
+            except (BadSignature, SignatureExpired):
+                pass  # Continue to login form
 
     if request.method == "POST":
         # Validate CSRF token on POST request
@@ -522,7 +548,7 @@ def login():
             logger.info(
                 "Successful login for user: %s from %s", username, request.remote_addr
             )
-            signed_val = signer.sign(username).decode("utf-8")
+            signed_val = cookie_signer.sign(username).decode("utf-8")
 
             resp = make_response(redirect(target_url))
             resp.set_cookie(
@@ -552,15 +578,39 @@ def login():
 
 @app.route("/verify", methods=["GET"])
 def verify():
-    signed_cookie = request.cookies.get(cfg["cookie"]["name"])
-    if not signed_cookie:
+    try:
+        signed_cookie = request.cookies.get(cfg["cookie"]["name"])
+        if is_authenticated(signed_cookie):
+            return "OK", 200
+        else:
+            return "Unauthorized", failed_response_code
+    except Exception as e:
+        logger.error("Error verifying authentication: %s", e)
         return "Unauthorized", failed_response_code
 
-    try:
-        signer.unsign(signed_cookie, max_age=cfg["auth"]["session_max_age"])
-        return "OK", 200
-    except (BadSignature, SignatureExpired):
-        return "Invalid Session", failed_response_code
+
+@app.route("/whoami", methods=["GET"])
+def whoami():
+    signed_cookie = request.cookies.get(cfg["cookie"]["name"])
+    if is_authenticated(signed_cookie):
+        try:
+            if not signed_cookie:
+                return "UnauthorizedD", failed_response_code
+
+            username = cookie_signer.unsign(
+                signed_cookie, max_age=cfg["auth"]["session_max_age"]
+            )
+            response_data = {
+                "username": username,
+                "remote_addr": request.remote_addr,
+                "user_agent": request.headers.get("User-Agent"),
+                "cookie_domain": get_cookie_subdomain() or "unknown.domain",
+                "cookie": json.dumps(request.cookies.get(cfg["cookie"]["name"])),
+            }
+            return json.dumps(response_data), 200
+        except (BadSignature, SignatureExpired):
+            return "Invalid session", 401
+    return "Unauthorized", failed_response_code
 
 
 @app.route("/logout", methods=["GET", "POST"])
