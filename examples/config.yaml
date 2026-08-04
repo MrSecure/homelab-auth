@@ -3,7 +3,7 @@ auth:
   session_max_age: 43200
 cookie:
   name: pecan_sandy_2608
-  secure: true
+  secure: false
   httponly: true
   samesite: Lax
   domain: null
