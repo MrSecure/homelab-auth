@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-CONFIG_FILE="${CONFIG_FILE:-/app/config.yaml}"
+CONFIG_FILE="${HOMELAB_AUTH_CONFIG_FILE:-/app/default-config.yaml}"
 SERVICE_PORT="${SERVICE_PORT:-55000}"
 PYTHON="${PYTHON:-python3}"
 
@@ -17,7 +17,6 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
     echo "Error: Config file not found at $CONFIG_FILE" >&2
     exit 1
 fi
-export HOMELAB_AUTH_CONFIG_FILE="$CONFIG_FILE"
 
 if [[ "${1:-}" == "--check-config" ]]; then
     exec gunicorn --check-config wsgi:app

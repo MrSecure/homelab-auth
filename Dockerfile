@@ -21,7 +21,7 @@ COPY "./src/homelab_auth" "/app/homelab_auth"
 COPY "./src/main.py" "/app/main.py"
 COPY "./src/wsgi.py" "/app/wsgi.py"
 COPY "./src/login_template.html.j2" "/app/login_template.html.j2"
-COPY "./support/config.yaml" "/app/config.yaml"
+COPY "./support/config.yaml" "/app/default-config.yaml"
 COPY "./support/users.htpasswd" "/app/users.htpasswd"
 COPY "./support/entrypoint.sh" "/app/entrypoint.sh"
 RUN chmod +x /app/entrypoint.sh
@@ -60,8 +60,8 @@ RUN groupadd -r app && useradd -m -r -g app app
 COPY --from=builder --chown=app:app /app /app
 
 # Create app user
-RUN chown root:app /app/config.yaml && \
-    chmod 0660 /app/config.yaml
+RUN chown root:app /app/default-config.yaml && \
+    chmod 0660 /app/default-config.yaml
 
 # Metadata
 ARG NAME="homelab_auth"

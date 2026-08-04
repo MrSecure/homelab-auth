@@ -11,10 +11,10 @@ services:
       - "55000:55000"
     volumes:
       # Mount config and user database as read-only for security
-      - ./config.yaml:/app/config.yaml:ro
+      - ./config.yaml:/app/new-config.yaml:ro
       - ./users.htpasswd:/app/users.htpasswd:ro
     environment:
-      - HOMELAB_AUTH_CONFIG_FILE=/app/config.yaml
+      - HOMELAB_AUTH_CONFIG_FILE=/app/new-config.yaml
       - HOMELAB_AUTH_HASHING_KEY='ThisIsADevKeyForHomelabAuth2608'
 
     #   # Optional: Override Gunicorn settings via environment variables
