@@ -1,5 +1,7 @@
 # Whoami Endpoint
 
+<!-- cSpell:disable -->
+
 URI Path: `/huzrabj6iiraigjxj5jveyr4f4rcstbtbrpa4kyh/whoami`
 
 Behavior:
