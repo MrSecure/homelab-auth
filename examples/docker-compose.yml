@@ -15,7 +15,10 @@ services:
       - ./users.htpasswd:/app/users.htpasswd:ro
     environment:
       - HOMELAB_AUTH_CONFIG_FILE=/app/config.yaml
-      - HOMELAB_AUTH_HASHING_KEY='ThisIsADevKeyForHomelabAuth'
+      - HOMELAB_AUTH_HASHING_KEY='ThisIsADevKeyForHomelabAuth2608'
 
     #   # Optional: Override Gunicorn settings via environment variables
     #   - GUNICORN_CMD_ARGS=--workers 4 --bind 0.0.0.0:55000 --access-logfile -
+
+## Test Case:
+# http://127.0.0.1:55000/login?rd=http://127.0.0.1:55000/huzrabj6iiraigjxj5jveyr4f4rcstbtbrpa4kyh/whoami

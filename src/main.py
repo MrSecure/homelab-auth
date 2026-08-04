@@ -38,7 +38,7 @@ from urllib.parse import urlparse
 
 # --- FIX: Passlib/Bcrypt 4.0+ Compatibility ---
 if not hasattr(bcrypt, "__about__"):
-    bcrypt.__about__ = type("obj", (object,), {"__version__": bcrypt.__version__})
+    bcrypt.__about__ = type("obj", (object,), {"__version__": bcrypt.__version__})  # type: ignore
 
 app = Flask(__name__)
 app.config["JSON_SORT_KEYS"] = False
@@ -118,7 +118,7 @@ def load_config(config_file: str = "config.yaml") -> dict:
 
 
 def validate_and_init_hashing_string(
-    cfg: dict, cli_key: str = None, env_key: str = None
+    cfg: dict, cli_key: str | None, env_key: str | None
 ) -> str:
     """
     Validate and initialize the hashing string for session signing.
@@ -365,7 +365,7 @@ def validate_csrf_token(
 
 
 def render_login_template(
-    title: str, feedback: str = None, csrf_token: str = None
+    title: str, feedback: str = "", advisory: str = "", csrf_token: str = ""
 ) -> str:
     """
     Render the login page template.
@@ -424,26 +424,6 @@ def render_login_template(
     )
 
 
-def is_authenticated(signed_cookie) -> bool:
-    """
-    Check if the user is authenticated based on the session cookie.
-
-    Returns:
-        True if authenticated, False otherwise
-    """
-    if not signed_cookie:
-        logger.debug("No session cookie found; user is not authenticated")
-        return False
-
-    try:
-        cookie_signer.unsign(signed_cookie, max_age=cfg["auth"]["session_max_age"])
-        logger.debug("Valid session cookie found; user is authenticated")
-        return True
-    except (BadSignature, SignatureExpired):
-        logger.debug("Invalid or expired session cookie; user is not authenticated")
-        return False
-
-
 # HTML Template (Keep same as previous response)
 LOGIN_FORM = """
 <!DOCTYPE html>
@@ -472,6 +452,26 @@ LOGIN_FORM = """
 </body>
 </html>
 """
+
+
+def is_authenticated(signed_cookie) -> bool:
+    """
+    Check if the user is authenticated based on the session cookie.
+
+    Returns:
+        True if authenticated, False otherwise
+    """
+    if not signed_cookie:
+        logger.debug("No session cookie found; user is not authenticated")
+        return False
+
+    try:
+        cookie_signer.unsign(signed_cookie, max_age=cfg["auth"]["session_max_age"])
+        logger.debug("Valid session cookie found; user is authenticated")
+        return True
+    except (BadSignature, SignatureExpired):
+        logger.debug("Invalid or expired session cookie; user is not authenticated")
+        return False
 
 
 @app.route("/", methods=["GET"])
@@ -503,15 +503,7 @@ def login():
     # --- Check for already logged-in user (valid session cookie) ---
     signed_cookie = request.cookies.get(cfg["cookie"]["name"])
     if is_authenticated(signed_cookie):
-        if signed_cookie:
-            try:
-                username = cookie_signer.unsign(
-                    signed_cookie, max_age=cfg["auth"]["session_max_age"]
-                )
-                # If valid session, redirect immediately
-                return redirect(target_url)
-            except (BadSignature, SignatureExpired):
-                pass  # Continue to login form
+        return redirect(target_url)
 
     if request.method == "POST":
         # Validate CSRF token on POST request
@@ -522,7 +514,7 @@ def login():
             )
             return render_login_template(
                 cfg["page"]["title"],
-                feedback="Invalid form submission. Please try again.",
+                feedback="Invalid Credentials.",
                 csrf_token=generate_csrf_token(request.remote_addr),
             ), 400
 

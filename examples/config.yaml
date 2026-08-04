@@ -2,7 +2,7 @@ auth:
   htpasswd_path: users.htpasswd
   session_max_age: 43200
 cookie:
-  name: pecan_sandy
+  name: pecan_sandy_2608
   secure: true
   httponly: true
   samesite: Lax
