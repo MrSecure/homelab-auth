@@ -18,7 +18,14 @@ import yaml
 import bcrypt
 import hashlib
 from pathlib import Path
-from flask import Flask, request, make_response, redirect, render_template_string
+from flask import (
+    Flask,
+    request,
+    make_response,
+    redirect,
+    render_template_string,
+    jsonify,
+)
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 from passlib.apache import HtpasswdFile
 from itsdangerous import (
@@ -589,28 +596,31 @@ def verify():
         return "Unauthorized", failed_response_code
 
 
-@app.route("/whoami", methods=["GET"])
+@app.route("/huzrabj6iiraigjxj5jveyr4f4rcstbtbrpa4kyh/whoami", methods=["GET"])
 def whoami():
     signed_cookie = request.cookies.get(cfg["cookie"]["name"])
-    if is_authenticated(signed_cookie):
-        try:
-            if not signed_cookie:
-                return "UnauthorizedD", failed_response_code
+    if not is_authenticated(signed_cookie):
+        return "Unauthorized", failed_response_code
 
-            username = cookie_signer.unsign(
-                signed_cookie, max_age=cfg["auth"]["session_max_age"]
-            )
-            response_data = {
-                "username": username,
-                "remote_addr": request.remote_addr,
-                "user_agent": request.headers.get("User-Agent"),
-                "cookie_domain": get_cookie_subdomain() or "unknown.domain",
-                "cookie": json.dumps(request.cookies.get(cfg["cookie"]["name"])),
-            }
-            return json.dumps(response_data), 200
-        except (BadSignature, SignatureExpired):
-            return "Invalid session", 401
-    return "Unauthorized", failed_response_code
+    try:
+        if not signed_cookie:
+            return "Unauthorized", failed_response_code
+
+        username = cookie_signer.unsign(
+            signed_cookie, max_age=cfg["auth"]["session_max_age"]
+        ).decode("utf-8")
+        response_data = {
+            "cookie_domain": get_cookie_subdomain() or "unknown.domain",
+            "cookie_name": cfg["cookie"]["name"],
+            "cookie": request.cookies.get(cfg["cookie"]["name"]),
+            "headers": dict(request.headers),
+            "remote_addr": request.remote_addr,
+            "user_agent": request.headers.get("User-Agent"),
+            "username": username,
+        }
+        return jsonify(response_data), 200
+    except (BadSignature, SignatureExpired):
+        return "Invalid session", 401
 
 
 @app.route("/logout", methods=["GET", "POST"])
