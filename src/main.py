@@ -588,7 +588,7 @@ def verify():
         return "Unauthorized", failed_response_code
 
 
-@app.route("/huzrabj6iiraigjxj5jveyr4f4rcstbtbrpa4kyh/whoami", methods=["GET"])
+@app.route("/endocyst-regardable-unstrictured-mullenize-coup/whoami", methods=["GET"])
 def whoami():
     signed_cookie = request.cookies.get(cfg["cookie"]["name"])
     if not signed_cookie:
