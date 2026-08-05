@@ -2,7 +2,7 @@
 
 <!-- cSpell:disable -->
 
-URI Path: `/huzrabj6iiraigjxj5jveyr4f4rcstbtbrpa4kyh/whoami`
+URI Path: `/endocyst-regardable-unstrictured-mullenize-coup/whoami`
 
 Behavior:
   - validate an existing homelab auth cookie, and then return request information in as JSON
@@ -15,7 +15,7 @@ Example:
 
 ```bash
 curl -sH 'Cookie: pecan_sandy_2608=testuser.anFJlg.EGa4RS8Htyhhyher1JFNI-zJXnM' \
-  http://127.0.0.1:55000/huzrabj6iiraigjxj5jveyr4f4rcstbtbrpa4kyh/whoami  | jq
+  http://127.0.0.1:55000/endocyst-regardable-unstrictured-mullenize-coup/whoami  | jq
 {
   "cookie": "testuser.anFJlg.EGa4RS8Htyhhyher1JFNI-zJXnM",
   "cookie_domain": ".0.0.1:55000",
