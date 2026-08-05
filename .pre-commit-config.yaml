@@ -50,16 +50,16 @@ repos:
    rev: a76da2ffdaf698a7fdbd755f89b051fef4c790fd  # frozen: 0.8.0b1
    hooks:
     - id: openapi-spec-validator
-#  - repo: https://github.com/streetsidesoftware/cspell-cli
-#    rev: 1cfa010f078c354f3ffb8413616280cc28f5ba21  # frozen: v9.4.0
-#    hooks:
-#      - id: cspell
-#        types: [markdown]
-#        args:
-#          - --no-must-find-files
-#          - --config
-#          - .github/linters/cspell.config.js
-#          - --no-progress
-#          - --no-summary
-#          - --gitignore
-#          - --files # this needs to be the last argument so that the paths are passed correctly.
+ - repo: https://github.com/streetsidesoftware/cspell-cli
+   rev: 1cfa010f078c354f3ffb8413616280cc28f5ba21  # frozen: v9.4.0
+   hooks:
+     - id: cspell
+       types: [markdown]
+       args:
+         - --no-must-find-files
+         - --config
+         - .github/linters/cspell.config.js
+         - --no-progress
+         - --no-summary
+         - --gitignore
+         - --files # this needs to be the last argument so that the paths are passed correctly.
