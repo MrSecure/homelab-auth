@@ -3,6 +3,8 @@
 homelab-auth script entrypoint
 """
 
+__version__ = "0.15.0-pre"
+
 import sys
 import logging
 import argparse
@@ -34,7 +36,7 @@ from itsdangerous import (
     SignatureExpired,
     URLSafeTimedSerializer,
 )
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 
 # --- FIX: Passlib/Bcrypt 4.0+ Compatibility ---
 if not hasattr(bcrypt, "__about__"):
@@ -276,13 +278,18 @@ def get_cookie_subdomain():
     return f".{domain}"
 
 
-def is_safe_redirect(target_url):
+def get_safe_redirect_url():
     """
-    Validate that the redirect URL's domain is within the cookie domain.
-    Returns True if safe, False otherwise.
+    Get a safe redirect URL from the request parameters.
+    Falls back to the default destination if the provided URL is unsafe.
     """
+    domain = get_cookie_subdomain()
+    fallback_url = f"https://{cfg['redir']['default_destination']}{domain}"
+    target_url = request.args.get("rd", fallback_url)
+
+    # Validate redirect URL is within allowed domain
     if target_url.startswith("/"):
-        return True  # Relative URLs are safe
+        return target_url  # Relative URLs are safe
 
     try:
         parsed = urlparse(target_url)
@@ -290,19 +297,19 @@ def is_safe_redirect(target_url):
         cookie_domain = get_cookie_subdomain()
 
         if not cookie_domain:
-            return False
+            return fallback_url
 
         # Remove leading dot from cookie domain for comparison
         cookie_domain_clean = cookie_domain.lstrip(".")
 
         # Check if target host is the cookie domain or a subdomain of it
         if target_host == cookie_domain_clean or target_host.endswith(cookie_domain):
-            return True
+            return target_url
 
-        return False
+        return fallback_url
     except Exception:
         logger.warning("Detected unsafe redirect URL: %s", target_url)
-        return False
+    return fallback_url
 
 
 def generate_csrf_token(remote_addr: str | None) -> str:
@@ -477,28 +484,16 @@ def is_authenticated(signed_cookie) -> bool:
 @app.route("/", methods=["GET"])
 def redir():
     domain = get_cookie_subdomain()
-    target_url = request.args.get(
-        "rd", f"https://{cfg['redir']['default_destination']}{domain}"
-    )
-
-    # Validate redirect URL is within allowed domain
-    if not is_safe_redirect(target_url):
-        target_url = f"https://{cfg['redir']['default_destination']}{domain}"
-
+    target_url = get_safe_redirect_url()
+    query = urlencode({"rd": target_url})
     login_url = f"https://{cfg['redir']['external_name']}{domain}"
-    return redirect(f"{login_url}/login?rd={target_url}", code=307)
+    return redirect(f"{login_url}/login?{query}", code=307)
 
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     domain = get_cookie_subdomain()
-    target_url = request.args.get(
-        "rd", f"https://{cfg['redir']['default_destination']}{domain}"
-    )
-
-    # Validate redirect URL is within allowed domain
-    if not is_safe_redirect(target_url):
-        target_url = f"https://{cfg['redir']['default_destination']}{domain}"
+    target_url = get_safe_redirect_url()
 
     # --- Check for already logged-in user (valid session cookie) ---
     signed_cookie = request.cookies.get(cfg["cookie"]["name"])
@@ -678,7 +673,7 @@ def handle_internal_error(error):
 @app.route("/healthz", methods=["GET"])
 def healthz():
     """Service health check endpoint for Docker and Traefik."""
-    return {"status": "healthy"}, 200
+    return {"status": "healthy", "version": __version__}, 200
 
 
 @app.route("/done", methods=["GET"])
