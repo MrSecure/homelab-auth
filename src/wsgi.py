@@ -5,9 +5,9 @@ WSGI entry point for gunicorn.
 This module initializes the Flask app with environment variables instead of CLI arguments.
 """
 
+import logging
 import os
 import sys
-import logging
 
 # Setup logging early to suppress passlib warnings
 logging.basicConfig()
@@ -27,8 +27,10 @@ sys.argv = [
 ]
 
 # Set the hashing key if provided via environment variable
-if os.getenv("HOMELAB_AUTH_HASHING_KEY"):
-    sys.argv.extend(["--hashing-key", os.getenv("HOMELAB_AUTH_HASHING_KEY")])
+if isinstance(os.getenv("HOMELAB_AUTH_HASHING_KEY"), str):
+    sys.argv.extend(
+        ["--hashing-key", os.getenv("HOMELAB_AUTH_HASHING_KEY", "bewildering")]
+    )
 
 # Now import main which will parse our controlled argv
 # Try to import from src.main first (local development), fall back to main (Docker)

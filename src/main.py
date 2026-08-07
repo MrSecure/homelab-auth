@@ -5,38 +5,38 @@ homelab-auth script entrypoint
 
 __version__ = "0.15.0-pre"
 
-import sys
-import logging
 import argparse
+import logging
 import os
+import sys
 
 # Setup logging early to suppress passlib warnings
-# noqa: E402
 logging.basicConfig()
 logging.getLogger("passlib.handlers.bcrypt").setLevel(logging.CRITICAL)
 
-import json
-import yaml
-import bcrypt
 import hashlib
+import json
 from pathlib import Path
+from urllib.parse import urlencode, urlparse
+
+import bcrypt
+import yaml
 from flask import (
     Flask,
-    request,
+    jsonify,
     make_response,
     redirect,
     render_template_string,
-    jsonify,
+    request,
+)
+from itsdangerous import (
+    BadSignature,
+    SignatureExpired,
+    TimestampSigner,
+    URLSafeTimedSerializer,
 )
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 from passlib.apache import HtpasswdFile
-from itsdangerous import (
-    TimestampSigner,
-    BadSignature,
-    SignatureExpired,
-    URLSafeTimedSerializer,
-)
-from urllib.parse import urlencode, urlparse
 
 # --- FIX: Passlib/Bcrypt 4.0+ Compatibility ---
 if not hasattr(bcrypt, "__about__"):
