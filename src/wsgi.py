@@ -27,10 +27,8 @@ sys.argv = [
 ]
 
 # Set the hashing key if provided via environment variable
-if isinstance(os.getenv("HOMELAB_AUTH_HASHING_KEY"), str):
-    sys.argv.extend(
-        ["--hashing-key", os.getenv("HOMELAB_AUTH_HASHING_KEY", "bewildering")]
-    )
+if os.getenv("HOMELAB_AUTH_HASHING_KEY"):
+    sys.argv.extend(["--hashing-key", os.getenv("HOMELAB_AUTH_HASHING_KEY")])
 
 # Now import main which will parse our controlled argv
 # Try to import from src.main first (local development), fall back to main (Docker)
