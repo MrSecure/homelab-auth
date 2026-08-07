@@ -3,35 +3,44 @@
 homelab-auth script entrypoint
 """
 
-import sys
-import logging
+__version__ = "0.15.0-pre"
+
 import argparse
+import logging
 import os
+import sys
 
 # Setup logging early to suppress passlib warnings
-# noqa: E402
 logging.basicConfig()
 logging.getLogger("passlib.handlers.bcrypt").setLevel(logging.CRITICAL)
 
-import json
-import yaml
-import bcrypt
 import hashlib
+import json
 from pathlib import Path
-from flask import Flask, request, make_response, redirect, render_template_string
-from jinja2 import Environment, FileSystemLoader, TemplateNotFound
-from passlib.apache import HtpasswdFile
+from urllib.parse import urlencode, urlparse
+
+import bcrypt
+import yaml
+from flask import (
+    Flask,
+    jsonify,
+    make_response,
+    redirect,
+    render_template_string,
+    request,
+)
 from itsdangerous import (
-    TimestampSigner,
     BadSignature,
     SignatureExpired,
+    TimestampSigner,
     URLSafeTimedSerializer,
 )
-from urllib.parse import urlparse
+from jinja2 import Environment, FileSystemLoader, TemplateNotFound
+from passlib.apache import HtpasswdFile
 
 # --- FIX: Passlib/Bcrypt 4.0+ Compatibility ---
 if not hasattr(bcrypt, "__about__"):
-    bcrypt.__about__ = type("obj", (object,), {"__version__": bcrypt.__version__})
+    bcrypt.__about__ = type("obj", (object,), {"__version__": bcrypt.__version__})  # type: ignore
 
 app = Flask(__name__)
 app.config["JSON_SORT_KEYS"] = False
@@ -111,7 +120,7 @@ def load_config(config_file: str = "config.yaml") -> dict:
 
 
 def validate_and_init_hashing_string(
-    cfg: dict, cli_key: str = None, env_key: str = None
+    cfg: dict, cli_key: str | None, env_key: str | None
 ) -> str:
     """
     Validate and initialize the hashing string for session signing.
@@ -227,7 +236,7 @@ logger.debug(
 
 # Create signer immediately and clear the key material from module scope
 # to prevent accidental exposure in exception tracebacks or log statements
-signer = TimestampSigner(hashing_string)
+cookie_signer = TimestampSigner(hashing_string)
 csrf_serializer = URLSafeTimedSerializer(hashing_string)
 del hashing_string  # Explicitly remove the cryptographic material from module scope
 
@@ -269,13 +278,18 @@ def get_cookie_subdomain():
     return f".{domain}"
 
 
-def is_safe_redirect(target_url):
+def get_safe_redirect_url():
     """
-    Validate that the redirect URL's domain is within the cookie domain.
-    Returns True if safe, False otherwise.
+    Get a safe redirect URL from the request parameters.
+    Falls back to the default destination if the provided URL is unsafe.
     """
+    domain = get_cookie_subdomain() or ""
+    fallback_url = f"https://{cfg['redir']['default_destination']}{domain}"
+    target_url = request.args.get("rd", fallback_url)
+
+    # Validate redirect URL is within allowed domain
     if target_url.startswith("/"):
-        return True  # Relative URLs are safe
+        return target_url  # Relative URLs are safe
 
     try:
         parsed = urlparse(target_url)
@@ -283,22 +297,22 @@ def is_safe_redirect(target_url):
         cookie_domain = get_cookie_subdomain()
 
         if not cookie_domain:
-            return False
+            return fallback_url
 
         # Remove leading dot from cookie domain for comparison
         cookie_domain_clean = cookie_domain.lstrip(".")
 
         # Check if target host is the cookie domain or a subdomain of it
         if target_host == cookie_domain_clean or target_host.endswith(cookie_domain):
-            return True
+            return target_url
 
-        return False
+        return fallback_url
     except Exception:
         logger.warning("Detected unsafe redirect URL: %s", target_url)
-        return False
+    return fallback_url
 
 
-def generate_csrf_token(remote_addr: str) -> str:
+def generate_csrf_token(remote_addr: str | None) -> str:
     """
     Generate a CSRF token for the current session.
 
@@ -312,6 +326,9 @@ def generate_csrf_token(remote_addr: str) -> str:
         Exception: If token generation fails
     """
     try:
+        if not remote_addr:
+            remote_addr = "FallBackToken-UnknownIP"
+            logger.warning("Remote address is None; using fallback CSRF token")
         token = csrf_serializer.dumps(remote_addr)
         logger.debug("Generated CSRF token for client: %s", remote_addr)
         return token
@@ -320,7 +337,9 @@ def generate_csrf_token(remote_addr: str) -> str:
         raise
 
 
-def validate_csrf_token(token: str, remote_addr: str, max_age: int = 3600) -> bool:
+def validate_csrf_token(
+    token: str | None, remote_addr: str | None, max_age: int = 3600
+) -> bool:
     """
     Validate a CSRF token.
 
@@ -353,7 +372,7 @@ def validate_csrf_token(token: str, remote_addr: str, max_age: int = 3600) -> bo
 
 
 def render_login_template(
-    title: str, feedback: str = None, csrf_token: str = None
+    title: str, feedback: str = "", advisory: str = "", csrf_token: str = ""
 ) -> str:
     """
     Render the login page template.
@@ -442,43 +461,44 @@ LOGIN_FORM = """
 """
 
 
+def is_authenticated(signed_cookie: str | None) -> bool:
+    """
+    Check if the user is authenticated based on the session cookie.
+
+    Returns:
+        True if authenticated, False otherwise
+    """
+    if not signed_cookie:
+        logger.debug("No session cookie found; user is not authenticated")
+        return False
+
+    try:
+        cookie_signer.unsign(signed_cookie, max_age=cfg["auth"]["session_max_age"])
+        logger.debug("Valid session cookie found; user is authenticated")
+        return True
+    except (BadSignature, SignatureExpired):
+        logger.debug("Invalid or expired session cookie; user is not authenticated")
+        return False
+
+
 @app.route("/", methods=["GET"])
 def redir():
     domain = get_cookie_subdomain()
-    target_url = request.args.get(
-        "rd", f"https://{cfg['redir']['default_destination']}{domain}"
-    )
-
-    # Validate redirect URL is within allowed domain
-    if not is_safe_redirect(target_url):
-        target_url = f"https://{cfg['redir']['default_destination']}{domain}"
-
+    target_url = get_safe_redirect_url()
+    query = urlencode({"rd": target_url})
     login_url = f"https://{cfg['redir']['external_name']}{domain}"
-    return redirect(f"{login_url}/login?rd={target_url}", code=307)
+    return redirect(f"{login_url}/login?{query}", code=307)
 
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     domain = get_cookie_subdomain()
-    target_url = request.args.get(
-        "rd", f"https://{cfg['redir']['default_destination']}{domain}"
-    )
-
-    # Validate redirect URL is within allowed domain
-    if not is_safe_redirect(target_url):
-        target_url = f"https://{cfg['redir']['default_destination']}{domain}"
+    target_url = get_safe_redirect_url()
 
     # --- Check for already logged-in user (valid session cookie) ---
     signed_cookie = request.cookies.get(cfg["cookie"]["name"])
-    if signed_cookie:
-        try:
-            username = signer.unsign(
-                signed_cookie, max_age=cfg["auth"]["session_max_age"]
-            )
-            # If valid session, redirect immediately
-            return redirect(target_url)
-        except (BadSignature, SignatureExpired):
-            pass  # Continue to login form
+    if is_authenticated(signed_cookie):
+        return redirect(target_url)
 
     if request.method == "POST":
         # Validate CSRF token on POST request
@@ -489,7 +509,7 @@ def login():
             )
             return render_login_template(
                 cfg["page"]["title"],
-                feedback="Invalid form submission. Please try again.",
+                feedback="Invalid Credentials.",
                 csrf_token=generate_csrf_token(request.remote_addr),
             ), 400
 
@@ -522,7 +542,7 @@ def login():
             logger.info(
                 "Successful login for user: %s from %s", username, request.remote_addr
             )
-            signed_val = signer.sign(username).decode("utf-8")
+            signed_val = cookie_signer.sign(username).decode("utf-8")
 
             resp = make_response(redirect(target_url))
             resp.set_cookie(
@@ -552,15 +572,52 @@ def login():
 
 @app.route("/verify", methods=["GET"])
 def verify():
+    try:
+        signed_cookie = request.cookies.get(cfg["cookie"]["name"])
+        if is_authenticated(signed_cookie):
+            return "OK", 200
+        else:
+            return "Unauthorized", failed_response_code
+    except Exception as e:
+        logger.error("Error verifying authentication: %s", e)
+        return "Unauthorized", failed_response_code
+
+
+@app.route("/endocyst-regardable-unstrictured-mullenize-coup/whoami", methods=["GET"])
+def whoami():
     signed_cookie = request.cookies.get(cfg["cookie"]["name"])
     if not signed_cookie:
+        logger.warning(
+            "Whoami request without session cookie from %s", request.remote_addr
+        )
+        return "Unauthorized", failed_response_code
+
+    if not is_authenticated(signed_cookie):
+        logger.warning(
+            "Whoami request with invalid session cookie from %s", request.remote_addr
+        )
         return "Unauthorized", failed_response_code
 
     try:
-        signer.unsign(signed_cookie, max_age=cfg["auth"]["session_max_age"])
-        return "OK", 200
+        username = cookie_signer.unsign(
+            signed_cookie, max_age=cfg["auth"]["session_max_age"]
+        ).decode("utf-8")
+        response_data = {
+            "cookie_domain": get_cookie_subdomain() or "unknown.domain",
+            "cookie_name": cfg["cookie"]["name"],
+            "cookie": request.cookies.get(cfg["cookie"]["name"]),
+            "headers": dict(request.headers),
+            "remote_addr": request.remote_addr,
+            "user_agent": request.headers.get("User-Agent"),
+            "username": username,
+        }
+        return jsonify(response_data), 200
     except (BadSignature, SignatureExpired):
-        return "Invalid Session", failed_response_code
+        logger.warning(
+            "Whoami request with invalid or expired session cookie from %s",
+            request.remote_addr,
+        )
+        return "Invalid session", 401
 
 
 @app.route("/logout", methods=["GET", "POST"])
@@ -616,7 +673,7 @@ def handle_internal_error(error):
 @app.route("/healthz", methods=["GET"])
 def healthz():
     """Service health check endpoint for Docker and Traefik."""
-    return {"status": "healthy"}, 200
+    return {"status": "healthy", "version": __version__}, 200
 
 
 @app.route("/done", methods=["GET"])

@@ -2,14 +2,15 @@ auth:
   htpasswd_path: users.htpasswd
   session_max_age: 43200
 cookie:
-  name: pecan_sandy
-  secure: true
+  name: pecan_sandy_2608
+  secure: false
   httponly: true
   samesite: Lax
   domain: null
   allowed_hosts:
   - dev.home.arpa
   - labs.home.arpa
+  - sslip.io
 server:
   port: 55000
   host: 0.0.0.0

@@ -5,9 +5,9 @@ WSGI entry point for gunicorn.
 This module initializes the Flask app with environment variables instead of CLI arguments.
 """
 
+import logging
 import os
 import sys
-import logging
 
 # Setup logging early to suppress passlib warnings
 logging.basicConfig()
