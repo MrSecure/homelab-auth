@@ -5,11 +5,11 @@
 URI Path: `/endocyst-regardable-unstrictured-mullenize-coup/whoami`
 
 Behavior:
-  - validate an existing homelab auth cookie, and then return request information in as JSON
+  - Validate an existing homelab-auth cookie, then return request information as JSON.
 
 Goal:
-  - hidden, authenticed endpoint that SPAs can use to extract the cookie data needed to build XHR requests.
-  - randomly named, such that a Traefik `Path()` rule can expose the endpoint for all sites behind traefik
+  - Hidden, authenticated endpoint that SPAs can use to extract the data needed to build XHR requests.
+  - Randomly named so that a Traefik `Path()` rule can expose the endpoint for all sites behind Traefik.
 
 Example:
 
