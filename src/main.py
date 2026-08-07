@@ -3,8 +3,6 @@
 homelab-auth script entrypoint
 """
 
-__version__ = "0.15.0-pre"
-
 import argparse
 import logging
 import os
@@ -28,6 +26,9 @@ from flask import (
     redirect,
     render_template_string,
     request,
+)
+from homelab_auth import (
+    __version__,
 )
 from itsdangerous import (
     BadSignature,
