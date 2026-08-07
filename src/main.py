@@ -461,7 +461,7 @@ LOGIN_FORM = """
 """
 
 
-def is_authenticated(signed_cookie) -> bool:
+def is_authenticated(signed_cookie: str | None) -> bool:
     """
     Check if the user is authenticated based on the session cookie.
 
