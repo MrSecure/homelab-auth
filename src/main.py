@@ -283,7 +283,7 @@ def get_safe_redirect_url():
     Get a safe redirect URL from the request parameters.
     Falls back to the default destination if the provided URL is unsafe.
     """
-    domain = get_cookie_subdomain()
+    domain = get_cookie_subdomain() or ""
     fallback_url = f"https://{cfg['redir']['default_destination']}{domain}"
     target_url = request.args.get("rd", fallback_url)
 
