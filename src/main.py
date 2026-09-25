@@ -244,6 +244,77 @@ del hashing_string  # Explicitly remove the cryptographic material from module s
 users = load_htpasswd_file(cfg["auth"]["htpasswd_path"])
 
 
+def extract_ip_from_hostname(hostname: str) -> str | None:
+    """
+    Extract IP address in dash format from hostname.
+
+    Extracts the IP address encoded in dash format from a hostname.
+    For example, "auth-34-21-77-231.sslip.io" -> "34-21-77-231"
+
+    Args:
+        hostname: The hostname to extract IP from
+
+    Returns:
+        IP address in dash format (e.g., "34-21-77-231") or None if not found
+    """
+    if not hostname:
+        return None
+
+    parts = hostname.split(".")
+    if not parts:
+        return None
+
+    # Get the first part (e.g., "auth-34-21-77-231")
+    first_part = parts[0]
+
+    # Split by dash to extract the IP portion
+    dashes = first_part.split("-")
+
+    # We need at least 5 parts: [basename, octet1, octet2, octet3, octet4]
+    if len(dashes) < 5:
+        return None
+
+    # The last 4 parts are the IP octets
+    ip_parts = dashes[-4:]
+
+    # Validate that all parts are numeric and valid octets
+    try:
+        for part in ip_parts:
+            octet = int(part)
+            if not (0 <= octet <= 255):
+                return None
+    except ValueError:
+        return None
+
+    # Return IP in dash format
+    return "-".join(ip_parts)
+
+
+def extract_domain_from_hostname(hostname: str) -> str | None:
+    """
+    Extract domain from hostname.
+
+    Extracts the base domain from a hostname.
+    For example, "auth-34-21-77-231.sslip.io" -> "sslip.io"
+
+    Args:
+        hostname: The hostname to extract domain from
+
+    Returns:
+        Domain name (e.g., "sslip.io") or None if cannot be extracted
+    """
+    if not hostname:
+        return None
+
+    parts = hostname.split(".")
+    if len(parts) < 2:
+        return None
+
+    # Extract base domain (everything except first subdomain)
+    domain = ".".join(parts[1:])
+    return domain
+
+
 def get_cookie_subdomain():
     """
     Extract subdomain from a hostname.
@@ -277,6 +348,37 @@ def get_cookie_subdomain():
     # Extract base domain (everything except first subdomain)
     domain = ".".join(parts[1:])
     return f".{domain}"
+
+
+def get_login_url() -> str:
+    """
+    Build login URL using IP address extracted from hostname.
+
+    Extracts the IP address in dash format from the incoming hostname
+    and builds the login URL in the format "auth-<ip-dash-form>.<domain>"
+
+    Returns:
+        Login URL with IP-based hostname (e.g., "https://auth-34-21-77-231.sslip.io")
+    """
+    hostname = request.headers.get("X-Forwarded-Host", request.host).lower()
+
+    # Extract IP address and domain from hostname
+    ip_dash = extract_ip_from_hostname(hostname)
+    domain = extract_domain_from_hostname(hostname)
+
+    if ip_dash and domain:
+        # Build login URL with extracted IP
+        login_url = f"https://{cfg['redir']['external_name']}-{ip_dash}.{domain}"
+        logger.debug("Built login URL from hostname: %s", login_url)
+        return login_url
+
+    # Fallback to traditional format if IP extraction fails
+    cookie_domain = get_cookie_subdomain() or ""
+    fallback_url = f"https://{cfg['redir']['external_name']}{cookie_domain}"
+    logger.debug(
+        "Failed to extract IP from hostname; using fallback login URL: %s", fallback_url
+    )
+    return fallback_url
 
 
 def get_safe_redirect_url():
@@ -484,10 +586,9 @@ def is_authenticated(signed_cookie: str | None) -> bool:
 
 @app.route("/", methods=["GET"])
 def redir():
-    domain = get_cookie_subdomain()
     target_url = get_safe_redirect_url()
     query = urlencode({"rd": target_url})
-    login_url = f"https://{cfg['redir']['external_name']}{domain}"
+    login_url = get_login_url()
     return redirect(f"{login_url}/login?{query}", code=307)
 
 
