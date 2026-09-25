@@ -490,7 +490,7 @@ gunicorn --workers 4 src.wsgi:app
 
 ## IP-Based Login URLs
 
-As of release 0.10.0, Home Lab Auth supports dynamic login URLs based on the IP address encoded in the incoming hostname. This is useful for dynamic DNS scenarios where the hostname contains the IP address in dash format (e.g., from services like sslip.io).
+Home Lab Auth supports dynamic login URLs based on the IP address encoded in the incoming hostname. This is useful for dynamic DNS scenarios where the hostname contains the IP address in dash format (e.g., from services like sslip.io).
 
 ### How It Works
 
