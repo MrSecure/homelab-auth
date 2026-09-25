@@ -368,7 +368,8 @@ def get_login_url() -> str:
 
     # Mirror get_cookie_subdomain() behavior: only trust X-Forwarded-Host when it matches the whitelist.
     if allowed_hosts and not any(
-        hostname == allowed.lower() or hostname.endswith("." + allowed.lower()) for allowed in allowed_hosts
+        hostname == allowed.lower() or hostname.endswith("." + allowed.lower())
+        for allowed in allowed_hosts
     ):
         hostname = request.host.split(",", 1)[0].strip().lower()
 
