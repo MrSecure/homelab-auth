@@ -360,9 +360,18 @@ def get_login_url() -> str:
     Returns:
         Login URL with IP-based hostname (e.g., "https://auth-34-21-77-231.sslip.io")
     """
-    hostname = request.headers.get("X-Forwarded-Host", request.host).lower()
+    allowed_hosts = cfg.get("cookie", {}).get("allowed_hosts", [])
+    hostname = request.headers.get("X-Forwarded-Host", request.host)
+    hostname = hostname.split(",", 1)[0].strip().lower()
+    if hostname.count(":") == 1 and hostname.rsplit(":", 1)[1].isdigit():
+        hostname = hostname.rsplit(":", 1)[0]
 
-    # Extract IP address and domain from hostname
+    # Mirror get_cookie_subdomain() behavior: only trust X-Forwarded-Host when it matches the whitelist.
+    if allowed_hosts and not any(
+        hostname == allowed.lower() or hostname.endswith("." + allowed.lower()) for allowed in allowed_hosts
+    ):
+        hostname = request.host.split(",", 1)[0].strip().lower()
+
     ip_dash = extract_ip_from_hostname(hostname)
     domain = extract_domain_from_hostname(hostname)
 
