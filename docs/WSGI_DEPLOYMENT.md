@@ -488,6 +488,68 @@ export HOMELAB_AUTH_HASHING_KEY="$(cat /etc/homelab-auth/key.txt)"
 gunicorn --workers 4 src.wsgi:app
 ```
 
+## IP-Based Login URLs
+
+Home Lab Auth supports dynamic login URLs based on the IP address encoded in the incoming hostname. This is useful for dynamic DNS scenarios where the hostname contains the IP address in dash format (e.g., from services like sslip.io).
+
+### How It Works
+
+When a user connects to a hostname like `dashboard-34-21-77-231.sslip.io`, the service:
+
+1. **Extracts the IP** from the hostname: `34-21-77-231`
+2. **Extracts the domain**: `sslip.io`
+3. **Builds the login URL** using the configured `external_name`: `https://auth-34-21-77-231.sslip.io`
+
+This allows the login service to use the same IP address as the original request, enabling transparent authentication across dynamic IP addresses.
+
+### Example Scenarios
+
+#### Scenario 1: Dynamic IP with sslip.io
+
+User connects to: `dashboard-34-21-77-231.sslip.io`
+- Extracted IP: `34-21-77-231`
+- Extracted domain: `sslip.io`
+- Login URL: `https://auth-34-21-77-231.sslip.io/login`
+
+#### Scenario 2: Local Network with Custom Domain
+
+User connects to: `services-192-168-1-100.home.arpa`
+- Extracted IP: `192-168-1-100`
+- Extracted domain: `home.arpa`
+- Login URL: `https://auth-192-168-1-100.home.arpa/login`
+
+### Configuration
+
+The feature uses the existing `redir.external_name` configuration to determine the login service hostname:
+
+```yaml
+redir:
+  external_name: auth        # Used to build login URL: auth-<ip>.<domain>
+  default_destination: dashboard
+```
+
+### Fallback Behavior
+
+If the service cannot extract a valid IP address from the hostname (e.g., the format doesn't match expected patterns), it gracefully falls back to the traditional format:
+
+```
+https://<external_name>.<domain>
+# or if domain extraction fails:
+https://<external_name>
+```
+
+This ensures backward compatibility with static hostnames and non-IP-based domains.
+
+### IP Format Validation
+
+The IP extraction validates that:
+
+1. The hostname has the format: `<basename>-<octet1>-<octet2>-<octet3>-<octet4>.<domain>`
+2. All four octets are numeric and in the range 0-255
+3. The domain has at least one dot (e.g., `sslip.io` or `home.arpa`)
+
+Invalid formats silently fall back to the traditional URL format.
+
 ## See Also
 
 - [README.md](../README.md) — Project overview and quick start
