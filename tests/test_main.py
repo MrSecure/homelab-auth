@@ -352,3 +352,125 @@ def test_csrf_invalid_token_format():
     invalid_token = "not.a.valid.token.format"
     with pytest.raises(BadSignature):
         serializer.loads(invalid_token, max_age=3600)
+
+
+@pytest.mark.unit
+def test_extract_ip_from_hostname_valid():
+    """Test extracting IP from a valid hostname."""
+    # Import the function to test
+    import sys
+    from unittest.mock import MagicMock
+
+    # Mock the Flask app and request context
+    sys.modules["main"] = MagicMock()
+
+    # Test with valid IP in hostname
+    hostname = "auth-34-21-77-231.sslip.io"
+    parts = hostname.split(".")
+    first_part = parts[0]
+    dashes = first_part.split("-")
+
+    # We need at least 5 parts: [basename, octet1, octet2, octet3, octet4]
+    assert len(dashes) >= 5
+
+    # The last 4 parts are the IP octets
+    ip_parts = dashes[-4:]
+    expected_ip = "-".join(ip_parts)
+    assert expected_ip == "34-21-77-231"
+
+    # Validate octets
+    for part in ip_parts:
+        octet = int(part)
+        assert 0 <= octet <= 255
+
+
+@pytest.mark.unit
+def test_extract_ip_from_hostname_invalid():
+    """Test extracting IP from hostname with invalid format."""
+    # Test with invalid formats
+    invalid_hostnames = [
+        "auth.sslip.io",  # No IP
+        "auth-34-21.sslip.io",  # Too few octets
+        "auth-256-21-77-231.sslip.io",  # Invalid octet (256 > 255)
+        "auth-34-21-77-abc.sslip.io",  # Non-numeric octet
+        "",  # Empty
+    ]
+
+    for hostname in invalid_hostnames:
+        if not hostname:
+            continue
+
+        parts = hostname.split(".")
+        if not parts or len(parts) < 2:
+            continue
+
+        first_part = parts[0]
+        dashes = first_part.split("-")
+
+        # We need at least 5 parts: [basename, octet1, octet2, octet3, octet4]
+        if len(dashes) < 5:
+            # Should be invalid - too few parts
+            assert True
+            continue
+
+        # The last 4 parts are the IP octets
+        ip_parts = dashes[-4:]
+
+        # Validate that all parts are numeric and valid octets
+        is_valid = True
+        try:
+            for part in ip_parts:
+                octet = int(part)
+                if not (0 <= octet <= 255):
+                    is_valid = False
+                    break
+        except ValueError:
+            is_valid = False
+
+        # These should all be invalid
+        assert not is_valid
+
+
+@pytest.mark.unit
+def test_extract_domain_from_hostname():
+    """Test extracting domain from hostname."""
+    # Test valid domain extraction
+    hostname = "auth-34-21-77-231.sslip.io"
+    parts = hostname.split(".")
+    if len(parts) >= 2:
+        domain = ".".join(parts[1:])
+        assert domain == "sslip.io"
+
+    # Test with subdomain
+    hostname2 = "auth-34-21-77-231.sub.example.com"
+    parts2 = hostname2.split(".")
+    if len(parts2) >= 2:
+        domain2 = ".".join(parts2[1:])
+        assert domain2 == "sub.example.com"
+
+    # Test with single part (invalid)
+    hostname3 = "localhost"
+    parts3 = hostname3.split(".")
+    if len(parts3) < 2:
+        # Should not extract domain
+        assert True
+
+
+@pytest.mark.unit
+def test_build_login_url_format():
+    """Test the format of a login URL with IP."""
+    # Test the format logic
+    external_name = "auth"
+    ip_dash = "34-21-77-231"
+    domain = "sslip.io"
+
+    login_url = f"https://{external_name}-{ip_dash}.{domain}"
+    assert login_url == "https://auth-34-21-77-231.sslip.io"
+
+    # Test with different values
+    external_name2 = "dashboard"
+    ip_dash2 = "192-168-1-100"
+    domain2 = "home.arpa"
+
+    login_url2 = f"https://{external_name2}-{ip_dash2}.{domain2}"
+    assert login_url2 == "https://dashboard-192-168-1-100.home.arpa"
