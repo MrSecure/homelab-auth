@@ -1,6 +1,29 @@
 # yaml-language-server: $schema=https://json.schemastore.org/traefik-v3.json
 http:
   router:
+    # Homelab Web server on labs domain - requires authentication
+    r-homelab-web:
+      rule: "Host(`web.labs.home.arpa`)"
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: myresolver
+      service: sv-homelab-web
+      middlewares:
+        - sso-auth-labs
+
+    # Homelab Web server on sslip domain - requires authentication
+    r-homelab-web-sslip:
+      rule: "Host(`web-10-9-8-177.sslip.io`)"
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: myresolver
+      service: sv-homelab-web
+      middlewares:
+        - sso-auth-sslip
+
+    # Homelab Auth server on labs domain
     r-homelab-auth:
       rule: "Host(`auth.labs.home.arpa`)"
       entryPoints:
@@ -8,8 +31,18 @@ http:
       tls:
         certResolver: myresolver
       service: sv-homelab-auth
-      middlewares:
-        - sso-auth
+      middlewares: []
+
+    # Homelab Auth server on sslip domain
+    r-homelab-auth-sslip:
+      rule: "Host(`auth-10-9-8-177.sslip.io`)"
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: myresolver
+      service: sv-homelab-auth
+      middlewares: []
+
 
   middlewares:
     # 1. The main auth check
@@ -23,27 +56,67 @@ http:
         addAuthCookiesToResponse:
           - "pecan_sandy" # needs to match config.yaml:cookie.name
 
-    # 2. The redirect logic if auth fails
-    auth-redirect:
+    # 2. Redirect for labs.home.arpa domain
+    auth-redirect-labs:
       errors:
         status:
-          - "401"
-        statusRewrites:            # redirect the browser to the login page on 401
-          "401": "307"
-        service: sv-homelab-auth   # Points to your auth app's service
-        query: "/?rd={url}"        # {url} is a Traefik variable for the original request
+          - "497"
+        statusRewrites:
+          "497": "307"
+        service: sv-homelab-auth-labs
+        query: "/?rd={url}"
 
-    # 3. Combined Chain
-    sso-auth:
+    # 3. Redirect for sslip.io domain
+    auth-redirect-sslip:
+      errors:
+        status:
+          - "497"
+        statusRewrites:
+          "497": "307"
+        service: sv-homelab-auth-sslip
+        query: "/?rd={url}"
+
+    # 4. Combined Chain for labs domain
+    sso-auth-labs:
       chain:
         middlewares:
-          - auth-redirect
+          - auth-redirect-labs
+          - auth-check
+
+    # 5. Combined Chain for sslip domain
+    sso-auth-sslip:
+      chain:
+        middlewares:
+          - auth-redirect-sslip
           - auth-check
 
   services:
+    # Labs domain auth service
+    sv-homelab-auth-labs:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:55000"
+        healthCheck:
+          path: "/healthz"
+
+    # sslip.io domain auth service (same backend, different name)
+    sv-homelab-auth-sslip:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:55000"
+        healthCheck:
+          path: "/healthz"
+
     sv-homelab-auth:
       loadBalancer:
         servers:
           - url: "http://127.0.0.1:55000"
+        healthCheck:
+          path: "/healthz"
+
+    sv-homelab-web:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:8000"
         healthCheck:
           path: "/healthz"
