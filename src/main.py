@@ -27,9 +27,6 @@ from flask import (
     render_template_string,
     request,
 )
-from homelab_auth import (
-    __version__,
-)
 from itsdangerous import (
     BadSignature,
     SignatureExpired,
@@ -38,6 +35,10 @@ from itsdangerous import (
 )
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 from passlib.apache import HtpasswdFile
+
+from homelab_auth import (
+    __version__,
+)
 
 # --- FIX: Passlib/Bcrypt 4.0+ Compatibility ---
 if not hasattr(bcrypt, "__about__"):
