@@ -438,6 +438,9 @@ def get_forwarded_original_url() -> str:
     forwarded_uri = request.headers.get("X-Forwarded-Uri", "/")
 
     host = forwarded_host.split(",", 1)[0].strip().lower()
+    if host.count(":") == 1 and host.rsplit(":", 1)[1].isdigit():
+        host = host.rsplit(":", 1)[0]
+
     proto = forwarded_proto.split(",", 1)[0].strip().lower()
     uri = forwarded_uri.split(",", 1)[0].strip()
 
