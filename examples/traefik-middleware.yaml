@@ -10,7 +10,7 @@ http:
         certResolver: myresolver
       service: sv-homelab-web
       middlewares:
-        - sso-auth-labs
+        - auth-check
 
     # Homelab Web server on sslip domain - requires authentication
     r-homelab-web-sslip:
@@ -21,7 +21,7 @@ http:
         certResolver: myresolver
       service: sv-homelab-web
       middlewares:
-        - sso-auth-sslip
+        - auth-check
 
     # Homelab Auth server on labs domain
     r-homelab-auth:
@@ -45,10 +45,13 @@ http:
 
 
   middlewares:
-    # 1. The main auth check
+    # ForwardAuth-only check.
+    # The /validate handler returns:
+    # - 200 when authenticated
+    # - 307 + Location when unauthenticated
     auth-check:
       forwardAuth:
-        address: "http://127.0.0.1:55000/verify"
+        address: "http://127.0.0.1:55000/validate"
         trustForwardHeader: true
         preserveLocationHeader: true
         authResponseHeaders:
@@ -56,57 +59,8 @@ http:
         addAuthCookiesToResponse:
           - "pecan_sandy" # needs to match config.yaml:cookie.name
 
-    # 2. Redirect for labs.home.arpa domain
-    auth-redirect-labs:
-      errors:
-        status:
-          - "497"
-        statusRewrites:
-          "497": "307"
-        service: sv-homelab-auth-labs
-        query: "/?rd={url}"
-
-    # 3. Redirect for sslip.io domain
-    auth-redirect-sslip:
-      errors:
-        status:
-          - "497"
-        statusRewrites:
-          "497": "307"
-        service: sv-homelab-auth-sslip
-        query: "/?rd={url}"
-
-    # 4. Combined Chain for labs domain
-    sso-auth-labs:
-      chain:
-        middlewares:
-          - auth-redirect-labs
-          - auth-check
-
-    # 5. Combined Chain for sslip domain
-    sso-auth-sslip:
-      chain:
-        middlewares:
-          - auth-redirect-sslip
-          - auth-check
 
   services:
-    # Labs domain auth service
-    sv-homelab-auth-labs:
-      loadBalancer:
-        servers:
-          - url: "http://127.0.0.1:55000"
-        healthCheck:
-          path: "/healthz"
-
-    # sslip.io domain auth service (same backend, different name)
-    sv-homelab-auth-sslip:
-      loadBalancer:
-        servers:
-          - url: "http://127.0.0.1:55000"
-        healthCheck:
-          path: "/healthz"
-
     sv-homelab-auth:
       loadBalancer:
         servers:

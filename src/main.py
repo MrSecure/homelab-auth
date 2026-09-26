@@ -425,6 +425,38 @@ def get_safe_redirect_url():
     return fallback_url
 
 
+def get_forwarded_original_url() -> str:
+    """
+    Build the original client URL from Traefik ForwardAuth headers.
+
+    Returns:
+        Absolute URL for the original request.
+    """
+    forwarded_host = request.headers.get("X-Forwarded-Host", request.host)
+    forwarded_proto = request.headers.get("X-Forwarded-Proto", "https")
+    forwarded_uri = request.headers.get("X-Forwarded-Uri", "/")
+
+    host = forwarded_host.split(",", 1)[0].strip().lower()
+    proto = forwarded_proto.split(",", 1)[0].strip().lower()
+    uri = forwarded_uri.split(",", 1)[0].strip()
+
+    if not uri.startswith("/"):
+        uri = f"/{uri}"
+
+    if proto not in {"http", "https"}:
+        proto = "https"
+    # verify the domain is one of the allowed by the cookie.allowed_hosts domains
+    allowed_hosts = cfg.get("cookie", {}).get("allowed_hosts", [])
+    if allowed_hosts:
+        allowed_hosts_clean = [h.lstrip(".") for h in allowed_hosts]
+        if host not in allowed_hosts_clean and not any(
+            host.endswith(f".{h}") for h in allowed_hosts_clean
+        ):
+            logger.warning("Original URL host not allowed by cookie rules: %s", host)
+            host = f"{cfg['redir']['default_destination']}.{allowed_hosts_clean[0]}"
+    return f"{proto}://{host}{uri}"
+
+
 def generate_csrf_token(remote_addr: str | None) -> str:
     """
     Generate a CSRF token for the current session.
@@ -690,6 +722,27 @@ def verify():
             return "OK", 200
         else:
             return "Unauthorized", failed_response_code
+    except Exception as e:
+        logger.error("Error verifying authentication: %s", e)
+        return "Unauthorized", failed_response_code
+
+
+@app.route("/validate", methods=["GET"])
+def validate():
+    try:
+        signed_cookie = request.cookies.get(cfg["cookie"]["name"])
+        if is_authenticated(signed_cookie):
+            return "OK", 200
+        original_url = get_forwarded_original_url()
+        redirect_target = (
+            f"{get_login_url().rstrip('/')}/?{urlencode({'rd': original_url})}"
+        )
+        logger.info(
+            "Unauthenticated request for %s; redirecting to %s",
+            original_url,
+            redirect_target,
+        )
+        return redirect(redirect_target, code=307)
     except Exception as e:
         logger.error("Error verifying authentication: %s", e)
         return "Unauthorized", failed_response_code
