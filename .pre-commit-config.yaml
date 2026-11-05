@@ -2,7 +2,7 @@
 exclude: '^homelab-auth/.*'
 repos:
  - repo: https://github.com/astral-sh/ruff-pre-commit
-   rev: a56c0b927e6465d37cae3e97d35d4d18ab2b96cd  # frozen: v0.16.9
+   rev: 25bcf95026b96e2dd3c0aec3090c3d6ef6ca2e6c  # frozen: v0.17.3
    hooks:
      - id: ruff-check
        types_or: [ python, pyi, jupyter ]
@@ -51,7 +51,7 @@ repos:
    hooks:
     - id: openapi-spec-validator
  - repo: https://github.com/streetsidesoftware/cspell-cli
-   rev: 058f44e47719e80d8f1e597a235310b60e937860  # frozen: v10.2.0
+   rev: f6467e1f1ebecf5020560405c7b26e01786a43c8  # frozen: v10.4.0
    hooks:
      - id: cspell
        types: [markdown]
